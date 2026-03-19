@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PATRIOTS: AIR DEFENSE</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- TITLE SCREEN -->
+        <div id="title-screen">
+            <div class="crt-overlay"></div>
+            <div class="title-content">
+                <div class="title-sub">PATRIOTS</div>
+                <h1 class="title-main">AIR DEFENSE</h1>
+                <div class="title-tagline">OLD-SCHOOL RADAR ARCADE</div>
+                <div class="title-divider"></div>
+                <div class="title-instruction blink">CLICK TO START</div>
+                <div id="leaderboard-panel">
+                    <div class="lb-title">HIGH SCORES</div>
+                    <div id="leaderboard-list"></div>
+                </div>
+                <div class="title-footer">SECTOR COMMAND v2.0</div>
+            </div>
+        </div>
+
+        <!-- OPERATOR SELECT -->
+        <div id="operator-screen" class="hidden">
+            <div class="crt-overlay"></div>
+            <div class="select-content">
+                <div class="select-title">SELECT OPERATOR</div>
+                <div class="select-divider"></div>
+                <div id="operator-grid" class="select-grid"></div>
+            </div>
+        </div>
+
+        <!-- MODE SELECT -->
+        <div id="mode-screen" class="hidden">
+            <div class="crt-overlay"></div>
+            <div class="select-content">
+                <div class="select-title">SELECT MODE</div>
+                <div class="select-divider"></div>
+                <div id="mode-grid" class="select-grid"></div>
+            </div>
+        </div>
+
+        <!-- MISSION SELECT -->
+        <div id="mission-screen" class="hidden">
+            <div class="crt-overlay"></div>
+            <div class="select-content">
+                <div class="select-title">SELECT MISSION</div>
+                <div class="select-divider"></div>
+                <div id="mission-list" class="mission-list"></div>
+            </div>
+        </div>
+
+        <!-- GAME SCREEN -->
+        <div id="game-screen" class="hidden">
+            <div class="crt-overlay"></div>
+
+            <!-- HUD TOP -->
+            <div id="hud-top">
+                <div id="hud-left">
+                    <div class="hud-label">SECTOR</div>
+                    <div id="wave-display">WAVE 01</div>
+                </div>
+                <div id="hud-center">
+                    <div class="hud-label">SCORE</div>
+                    <div id="score-display">000000</div>
+                </div>
+                <div id="hud-right">
+                    <div class="hud-label">BASE INTEGRITY</div>
+                    <div id="health-bar">
+                        <div id="health-fill"></div>
+                    </div>
+                    <div id="health-text">100%</div>
+                </div>
+            </div>
+
+            <!-- MAIN GAME AREA -->
+            <div id="game-area">
+                <canvas id="radar-canvas"></canvas>
+                <div id="status-messages"></div>
+            </div>
+
+            <!-- HUD BOTTOM -->
+            <div id="hud-bottom">
+                <div id="hud-weapon">
+                    <div class="hud-label">WEAPON [1-2-3]</div>
+                    <div id="weapon-display">STANDARD</div>
+                </div>
+                <div id="hud-ammo">
+                    <div class="hud-label">MISSILES</div>
+                    <div id="ammo-display">
+                        <span id="ammo-count">20</span>/<span id="ammo-max">20</span>
+                    </div>
+                </div>
+                <div id="hud-combo">
+                    <div class="hud-label">COMBO</div>
+                    <div id="combo-display">x0</div>
+                </div>
+                <div id="hud-cooldown">
+                    <div class="hud-label">RELOAD</div>
+                    <div id="cooldown-bar">
+                        <div id="cooldown-fill"></div>
+                    </div>
+                </div>
+                <div id="hud-targets">
+                    <div class="hud-label">THREATS</div>
+                    <div id="targets-count">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WAVE INTRO -->
+        <div id="wave-intro" class="hidden">
+            <div class="wave-text">WAVE <span id="wave-intro-num">01</span></div>
+            <div class="wave-subtext" id="wave-intro-sub">INCOMING</div>
+        </div>
+
+        <!-- GAME OVER SCREEN -->
+        <div id="gameover-screen" class="hidden">
+            <div class="crt-overlay"></div>
+            <div class="gameover-content">
+                <div class="gameover-title" id="gameover-title">SECTOR LOST</div>
+                <div class="gameover-divider"></div>
+                <div class="gameover-stats">
+                    <div class="stat-row">
+                        <span class="stat-label">FINAL SCORE</span>
+                        <span class="stat-value" id="final-score">000000</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">WAVES SURVIVED</span>
+                        <span class="stat-value" id="final-waves">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">TARGETS DESTROYED</span>
+                        <span class="stat-value" id="final-kills">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">ACCURACY</span>
+                        <span class="stat-value" id="final-accuracy">0%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">BEST COMBO</span>
+                        <span class="stat-value" id="final-combo">x0</span>
+                    </div>
+                </div>
+                <div class="gameover-divider"></div>
+                <div class="gameover-instruction blink">CLICK TO RETRY</div>
+            </div>
+        </div>
+
+        <!-- UPGRADE SCREEN -->
+        <div id="upgrade-screen" class="hidden">
+            <div class="crt-overlay"></div>
+            <div class="upgrade-content">
+                <div class="upgrade-title">SECTOR CLEAR</div>
+                <div class="upgrade-subtitle">CHOOSE UPGRADE</div>
+                <div class="upgrade-divider"></div>
+                <div id="upgrade-options"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="sound.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
