@@ -26,6 +26,9 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
+    "experiments": {
+      "baseUrl": "/PATRIOTS/orbita-web"
+    },
     "plugins": [
       "expo-screen-orientation"
     ]
