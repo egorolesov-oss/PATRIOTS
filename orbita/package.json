@@ -9,15 +9,18 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "^55.0.9",
     "expo": "~54.0.33",
     "expo-screen-orientation": "~8.1.2",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
+    "react-dom": "^19.2.4",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.25.0",
     "react-native-reanimated": "~3.18.0",
     "react-native-safe-area-context": "~5.4.0",
-    "react-native-svg": "~15.12.0"
+    "react-native-svg": "~15.12.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
