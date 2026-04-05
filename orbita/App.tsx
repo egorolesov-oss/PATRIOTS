@@ -64,7 +64,7 @@ function GameScreen() {
   const timeRatio = state.timeLeft / state.totalTime;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.bgWrapper} pointerEvents="none">
         {showTitle ? (
           <Image
@@ -151,7 +151,7 @@ function GameScreen() {
               />
             ))}
           </View>
-          <View style={styles.bottomPanel}>
+          <View style={[styles.bottomPanel, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
             <PowerUpPanel
               powerUps={state.powerUps}
               onUsePowerUp={usePowerUp}
