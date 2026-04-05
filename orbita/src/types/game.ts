@@ -66,7 +66,7 @@ export interface SwipeState {
 export interface GameState {
   planets: Planet[];
   score: number;
-  movesLeft: number;
+  swapsLeft: number;
   selectedPlanetId: string | null;
   phase: 'title' | 'playing' | 'gameover';
   powerUps: PowerUpState[];
@@ -84,5 +84,7 @@ export interface OrbitMatch {
 export const STAR_SIZE = 50;
 export const PLANET_SIZE = 42;
 export const PLANET_HITBOX = 36;
-export const INITIAL_MOVES = 30;
+export const INITIAL_SWAPS = 7;
+export const SWAP_PROXIMITY = 13; // degrees — max angle diff for cross-orbit swap
+export const SWAP_WARN_PROXIMITY = 25; // degrees — start showing proximity indicator
 export const ROTATION_SLOWDOWN = 0.3;

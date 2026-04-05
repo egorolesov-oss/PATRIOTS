@@ -3,6 +3,8 @@ import {
   PlanetType,
   ORBIT_CONFIGS,
   PLANET_HITBOX,
+  SWAP_PROXIMITY,
+  SWAP_WARN_PROXIMITY,
 } from '../types/game';
 
 const PLANET_TYPES = Object.values(PlanetType);
@@ -135,6 +137,63 @@ export function findAlignedGroups(
   }
 
   return ids;
+}
+
+/**
+ * Find all cross-orbit planet pairs that are close enough to swap.
+ * Returns pairs with their angle difference.
+ */
+export interface ProximityPair {
+  a: Planet;
+  b: Planet;
+  angleDiff: number;
+  canSwap: boolean; // within SWAP_PROXIMITY
+}
+
+export function findProximityPairs(
+  planets: Planet[],
+  rotationAngles: number[]
+): ProximityPair[] {
+  const pairs: ProximityPair[] = [];
+
+  for (let i = 0; i < planets.length; i++) {
+    for (let j = i + 1; j < planets.length; j++) {
+      const a = planets[i];
+      const b = planets[j];
+      // Must be on adjacent orbits
+      if (Math.abs(a.orbitIndex - b.orbitIndex) !== 1) continue;
+
+      const angleA = getPlanetAngle(a, rotationAngles);
+      const angleB = getPlanetAngle(b, rotationAngles);
+      const diff = angleDiff(angleA, angleB);
+
+      if (diff < SWAP_WARN_PROXIMITY) {
+        pairs.push({
+          a,
+          b,
+          angleDiff: diff,
+          canSwap: diff < SWAP_PROXIMITY,
+        });
+      }
+    }
+  }
+
+  return pairs;
+}
+
+/**
+ * Check if two specific planets are close enough to swap cross-orbit.
+ */
+export function canSwapPlanets(
+  planetA: Planet,
+  planetB: Planet,
+  rotationAngles: number[]
+): boolean {
+  if (planetA.orbitIndex === planetB.orbitIndex) return false;
+  if (Math.abs(planetA.orbitIndex - planetB.orbitIndex) !== 1) return false;
+  const angleA = getPlanetAngle(planetA, rotationAngles);
+  const angleB = getPlanetAngle(planetB, rotationAngles);
+  return angleDiff(angleA, angleB) < SWAP_PROXIMITY;
 }
 
 export function calculateScore(matchCount: number, combo: number): number {
