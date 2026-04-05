@@ -10,7 +10,7 @@ import Animated, {
   withRepeat,
   Easing,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
+import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { Planet, PLANET_CONFIGS, PLANET_SIZE } from '../types/game';
 import { getSlotPosition } from '../engine/board';
 
@@ -226,14 +226,15 @@ export const PlanetView: React.FC<Props> = ({
 
   const sprite = PLANET_SPRITES[config.sprite];
 
-  // Calculate lighting direction: gradient points FROM star center TO planet
-  // So the sun-facing side (toward center) is bright, far side is dark
+  // Lighting: sun-facing side bright, far side dark
   const angleToCenter = Math.atan2(centerY - pos.y, centerX - pos.x);
-  // SVG gradient coordinates: (x1,y1) = lit side (toward star), (x2,y2) = dark side
-  const gradX1 = 50 + Math.cos(angleToCenter) * 50;
-  const gradY1 = 50 + Math.sin(angleToCenter) * 50;
-  const gradX2 = 50 - Math.cos(angleToCenter) * 50;
-  const gradY2 = 50 - Math.sin(angleToCenter) * 50;
+  const half = pSize / 2;
+  // Highlight center shifted toward the star (30% offset)
+  const highlightCx = 50 + Math.cos(angleToCenter) * 30;
+  const highlightCy = 50 + Math.sin(angleToCenter) * 30;
+  // Shadow center shifted away from star (25% offset)
+  const shadowCx = 50 - Math.cos(angleToCenter) * 25;
+  const shadowCy = 50 - Math.sin(angleToCenter) * 25;
 
   return (
     <Animated.View style={[styles.planetContainer, animatedStyle, { width: pSize, height: pSize }]}>
@@ -253,20 +254,33 @@ export const PlanetView: React.FC<Props> = ({
       <Animated.View style={spinStyle}>
         <Image source={sprite} style={{ width: pSize, height: pSize, borderRadius: pSize / 2 }} resizeMode="cover" />
       </Animated.View>
+      {/* Realistic spherical lighting */}
       <View style={[styles.lightingOverlay, { width: pSize, height: pSize }]} pointerEvents="none">
         <Svg width={pSize} height={pSize}>
           <Defs>
-            <LinearGradient
-              id={`light-${planet.id}`}
-              x1={`${gradX1}%`} y1={`${gradY1}%`}
-              x2={`${gradX2}%`} y2={`${gradY2}%`}
+            {/* Specular highlight — shifted radial glow toward star */}
+            <RadialGradient
+              id={`highlight-${planet.id}`}
+              cx={`${highlightCx}%`} cy={`${highlightCy}%`} r="45%"
             >
-              <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
-              <Stop offset="40%" stopColor="#000000" stopOpacity="0" />
-              <Stop offset="100%" stopColor="#000000" stopOpacity="0.4" />
-            </LinearGradient>
+              <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
+              <Stop offset="50%" stopColor="#ffffff" stopOpacity="0.08" />
+              <Stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </RadialGradient>
+            {/* Shadow — shifted radial darkness away from star */}
+            <RadialGradient
+              id={`shadow-${planet.id}`}
+              cx={`${shadowCx}%`} cy={`${shadowCy}%`} r="55%"
+            >
+              <Stop offset="0%" stopColor="#000000" stopOpacity="0.5" />
+              <Stop offset="60%" stopColor="#000000" stopOpacity="0.2" />
+              <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+            </RadialGradient>
           </Defs>
-          <Circle cx={pSize / 2} cy={pSize / 2} r={pSize / 2 - 1} fill={`url(#light-${planet.id})`} />
+          {/* Shadow layer first */}
+          <Circle cx={half} cy={half} r={half - 1} fill={`url(#shadow-${planet.id})`} />
+          {/* Highlight layer on top */}
+          <Circle cx={half} cy={half} r={half - 1} fill={`url(#highlight-${planet.id})`} />
         </Svg>
       </View>
     </Animated.View>
