@@ -156,6 +156,8 @@ function GameScreen() {
               />
             ))}
           </View>
+          {/* Absolute dark block covering everything below bottom panel to screen edge */}
+          <View style={[styles.bottomEdge, { height: insets.bottom + 50 }]} pointerEvents="none" />
           <View style={[styles.bottomPanel, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
             <PowerUpPanel
               powerUps={state.powerUps}
@@ -369,6 +371,14 @@ const styles = StyleSheet.create({
   bottomGradient: {
     height: 40,
     flexDirection: 'column',
+  },
+  bottomEdge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#060818',
+    zIndex: 0,
   },
   bottomPanel: {
     paddingHorizontal: 16,
