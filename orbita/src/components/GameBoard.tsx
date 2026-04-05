@@ -124,8 +124,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       const planet = findNearestPlanet(event.x, event.y);
       if (planet) onSwipeThrough(planet);
     })
-    .onEnd(() => onSwipeEnd())
-    .onFinalize(() => onSwipeEnd());
+    .onEnd(() => onSwipeEnd());
 
   const tapGesture = Gesture.Tap().onEnd((event) => {
     const planet = findNearestPlanet(event.x, event.y);
