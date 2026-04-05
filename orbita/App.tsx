@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,11 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import Animated, {
   FadeIn,
   FadeOut,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import { StarField } from './src/components/StarField';
 import { GameBoard } from './src/components/GameBoard';
@@ -28,6 +33,22 @@ function GameScreen() {
   const { state, startGame, usePowerUp } = game;
 
   const [showTitle, setShowTitle] = useState(true);
+
+  // Very slow background rotation
+  const bgRotation = useSharedValue(0);
+  useEffect(() => {
+    bgRotation.value = withRepeat(
+      withTiming(360, { duration: 240000, easing: Easing.linear }), // 4 minutes per rotation
+      -1,
+      false
+    );
+  }, []);
+  const bgAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: 1.4 }, // scale up so edges don't show during rotation
+      { rotate: `${bgRotation.value}deg` },
+    ],
+  }));
 
   // Board size: 70% of available height or width, whichever is smaller
   const availableHeight = SCREEN_H - insets.top - insets.bottom - 180;
@@ -45,9 +66,9 @@ function GameScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Image
+      <Animated.Image
         source={require('./src/../assets/space-bg.png')}
-        style={styles.bgImage}
+        style={[styles.bgImage, bgAnimStyle]}
         resizeMode="cover"
       />
       <StatusBar barStyle="light-content" backgroundColor="#0a0e27" />
