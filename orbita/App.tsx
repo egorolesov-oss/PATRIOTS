@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  ImageBackground,
   StyleSheet,
   Dimensions,
   StatusBar,
@@ -43,7 +44,11 @@ function GameScreen() {
   const timeRatio = state.timeLeft / state.totalTime;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <ImageBackground
+      source={require('./src/../assets/space-bg.png')}
+      style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+      resizeMode="cover"
+    >
       <StatusBar barStyle="light-content" backgroundColor="#0a0e27" />
       <StarField />
 
@@ -180,7 +185,7 @@ function GameScreen() {
           </View>
         </Animated.View>
       )}
-    </View>
+    </ImageBackground>
   );
 }
 
