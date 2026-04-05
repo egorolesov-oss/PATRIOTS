@@ -43,7 +43,7 @@ export interface UseGameStateReturn {
   currentLevel: LevelConfig;
   levelStars: number[];
   maxUnlockedLevel: number;
-  startLevel: (levelId: number) => void;
+  startLevel: (levelId: number, customLevel?: LevelConfig) => void;
   startGame: () => void;
   selectPlanet: (planet: Planet) => void;
   onSwipeStart: (planet: Planet) => void;
@@ -152,8 +152,8 @@ export function useGameState(): UseGameStateReturn {
     }
   }, [isPaused]);
 
-  const startLevel = useCallback((levelId: number) => {
-    const level = LEVELS.find((l) => l.id === levelId) || LEVELS[0];
+  const startLevel = useCallback((levelId: number, customLevel?: LevelConfig) => {
+    const level = customLevel || LEVELS.find((l) => l.id === levelId) || LEVELS[0];
     setCurrentLevel(level);
     const planets = generateBoard(level.planetTypes, level.slots);
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);

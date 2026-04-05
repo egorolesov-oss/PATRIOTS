@@ -26,6 +26,7 @@ import { SupernovaExplosion } from './src/components/SupernovaExplosion';
 import { Tutorial } from './src/components/Tutorial';
 import { useGameState } from './src/hooks/useGameState';
 import { LEVELS } from './src/types/levels';
+import { ARCHITECT_LEVELS } from './src/types/architect';
 import { getSlotPosition } from './src/engine/board';
 import { stopMusic } from './src/engine/sounds';
 import { PLANET_CONFIGS } from './src/types/game';
@@ -38,7 +39,9 @@ function GameScreen() {
   const { state, startGame, startLevel, usePowerUp, currentLevel, levelStars, maxUnlockedLevel, alignedTriples, rotationAngles } = game;
 
   const [showTitle, setShowTitle] = useState(true);
+  const [showModeSelect, setShowModeSelect] = useState(false);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
+  const [gameMode, setGameMode] = useState<'supernova' | 'architect'>('supernova');
   const [showLevelIntro, setShowLevelIntro] = useState(false);
   const [pendingLevelId, setPendingLevelId] = useState(1);
   const [showTutorial, setShowTutorial] = useState(true);
@@ -67,20 +70,45 @@ function GameScreen() {
   const handleTitleTap = useCallback(() => {
     if (showTitle) {
       setShowTitle(false);
-      setShowLevelSelect(true);
+      setShowModeSelect(true);
     }
   }, [showTitle]);
+
+  const handleSelectMode = useCallback((mode: 'supernova' | 'architect') => {
+    setGameMode(mode);
+    setShowModeSelect(false);
+    setShowLevelSelect(true);
+  }, []);
 
   const handleSelectLevel = useCallback((levelId: number) => {
     setShowLevelSelect(false);
     setPendingLevelId(levelId);
     setShowLevelIntro(true);
-  }, []);
+  }, [gameMode]);
 
   const handleStartFromIntro = useCallback(() => {
     setShowLevelIntro(false);
-    startLevel(pendingLevelId);
-  }, [startLevel, pendingLevelId]);
+    if (gameMode === 'architect') {
+      const archLevel = ARCHITECT_LEVELS.find((l) => l.id === pendingLevelId);
+      if (archLevel) {
+        // Convert architect level to LevelConfig with long timer
+        startLevel(pendingLevelId, {
+          id: archLevel.id,
+          name: archLevel.name,
+          time: 9999,
+          rescueTarget: 999,
+          swaps: archLevel.swaps,
+          planetTypes: archLevel.planetTypes,
+          slots: archLevel.slots,
+          speedMultiplier: archLevel.speedMultiplier,
+          alignmentTolerance: 25,
+          powerUps: [],
+        });
+      }
+    } else {
+      startLevel(pendingLevelId);
+    }
+  }, [startLevel, pendingLevelId, gameMode]);
 
   const progressWidth = (state.timeLeft / state.totalTime) * 100;
   const timeRatio = state.timeLeft / state.totalTime;
@@ -135,14 +163,50 @@ function GameScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Mode Select Screen */}
+      {showModeSelect && (
+        <Animated.View entering={FadeIn.duration(400)} style={styles.modeSelectContainer}>
+          <Text style={styles.modeSelectTitle}>CHOOSE MODE</Text>
+
+          <TouchableOpacity
+            style={styles.modeCard}
+            onPress={() => handleSelectMode('supernova')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.modeCardIcon}>💥</Text>
+            <View style={styles.modeCardContent}>
+              <Text style={styles.modeCardTitle}>SUPERNOVA</Text>
+              <Text style={styles.modeCardDesc}>Rescue planets before the star explodes!</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.modeCard}
+            onPress={() => handleSelectMode('architect')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.modeCardIcon}>✨</Text>
+            <View style={styles.modeCardContent}>
+              <Text style={styles.modeCardTitle}>ARCHITECT</Text>
+              <Text style={styles.modeCardDesc}>Build the target constellation pattern</Text>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       {/* Level Select Screen */}
       {showLevelSelect && (
         <Animated.View entering={FadeIn.duration(400)} style={styles.levelSelectContainer}>
-          <Text style={styles.levelSelectTitle}>SELECT SYSTEM</Text>
+          <TouchableOpacity onPress={() => { setShowLevelSelect(false); setShowModeSelect(true); }}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.levelSelectTitle}>
+            {gameMode === 'supernova' ? '💥 SUPERNOVA' : '✨ ARCHITECT'}
+          </Text>
           <View style={styles.levelGrid}>
-            {LEVELS.map((level) => {
-              const unlocked = level.id <= maxUnlockedLevel;
-              const stars = levelStars[level.id - 1] || 0;
+            {(gameMode === 'supernova' ? LEVELS : ARCHITECT_LEVELS).map((level) => {
+              const unlocked = gameMode === 'architect' || level.id <= maxUnlockedLevel;
+              const stars = gameMode === 'supernova' ? (levelStars[level.id - 1] || 0) : 0;
               return (
                 <TouchableOpacity
                   key={level.id}
@@ -186,13 +250,17 @@ function GameScreen() {
             entering={FadeIn.delay(600).duration(500)}
             style={styles.levelIntroName}
           >
-            {LEVELS.find((l) => l.id === pendingLevelId)?.name || ''}
+            {gameMode === 'supernova'
+              ? (LEVELS.find((l) => l.id === pendingLevelId)?.name || '')
+              : (ARCHITECT_LEVELS.find((l) => l.id === pendingLevelId)?.name || '')}
           </Animated.Text>
           <Animated.Text
             entering={FadeIn.delay(1000).duration(500)}
             style={styles.levelIntroTarget}
           >
-            Rescue {LEVELS.find((l) => l.id === pendingLevelId)?.rescueTarget || 0} planets
+            {gameMode === 'supernova'
+              ? `Rescue ${LEVELS.find((l) => l.id === pendingLevelId)?.rescueTarget || 0} planets`
+              : `Build the pattern (${ARCHITECT_LEVELS.find((l) => l.id === pendingLevelId)?.swaps || 0} swaps)`}
           </Animated.Text>
           <Animated.Text
             entering={FadeIn.delay(1400).duration(500)}
@@ -214,7 +282,7 @@ function GameScreen() {
               style={styles.menuButton}
               onPress={() => {
                 stopMusic();
-                setShowTitle(true);
+                setShowModeSelect(true);
                 setShowLevelSelect(false);
                 setShowLevelIntro(false);
               }}
@@ -233,7 +301,7 @@ function GameScreen() {
                 styles.timerValue,
                 state.timeLeft <= 30 && styles.movesLow,
               ]}>
-                {Math.ceil(state.timeLeft)}s
+                {gameMode === 'architect' ? '∞' : `${Math.ceil(state.timeLeft)}s`}
               </Text>
               {state.combo >= 2 && (
                 <Text style={styles.comboLabel}>COMBO x{
@@ -713,6 +781,51 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     backgroundColor: 'rgba(255, 0, 0, 0.05)',
   },
+  modeSelectContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 90,
+    backgroundColor: 'rgba(6, 8, 24, 0.95)',
+    paddingHorizontal: 24,
+  },
+  modeSelectTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#ffd700',
+    letterSpacing: 6,
+    marginBottom: 32,
+  },
+  modeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 20,
+    marginBottom: 16,
+  },
+  modeCardIcon: {
+    fontSize: 36,
+    marginRight: 16,
+  },
+  modeCardContent: {
+    flex: 1,
+  },
+  modeCardTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#f5e6c8',
+    letterSpacing: 2,
+  },
+  modeCardDesc: {
+    fontSize: 12,
+    color: 'rgba(245, 230, 200, 0.5)',
+    marginTop: 4,
+  },
   levelSelectContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -720,6 +833,13 @@ const styles = StyleSheet.create({
     zIndex: 90,
     backgroundColor: 'rgba(6, 8, 24, 0.95)',
     paddingHorizontal: 20,
+  },
+  backText: {
+    color: 'rgba(245, 230, 200, 0.5)',
+    fontSize: 14,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    letterSpacing: 1,
   },
   levelSelectTitle: {
     fontSize: 28,
