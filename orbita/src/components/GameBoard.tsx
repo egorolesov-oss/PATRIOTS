@@ -1,12 +1,18 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
-import { ORBIT_CONFIGS, Planet } from '../types/game';
-import { getSlotPosition } from '../engine/board';
+import { View, StyleSheet } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import {
+  ORBIT_CONFIGS,
+  STAR_HITZONE,
+  ROTATION_SLOWDOWN,
+  Planet,
+} from '../types/game';
+import { getSlotPosition, normalizeAngle } from '../engine/board';
 import { StarCore } from './StarCore';
 import { OrbitalRings } from './OrbitalRings';
 import { PlanetView } from './PlanetView';
-import { ConjunctionBeam } from './ConjunctionBeam';
-import { CascadePopup } from './CascadePopup';
+import { SwipeRayBeam } from './SwipeRayBeam';
+import { AlignmentLines } from './AlignmentLines';
 import { UseGameStateReturn } from '../hooks/useGameState';
 
 interface Props {
@@ -18,19 +24,18 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
   const {
     state,
     rotationAngles,
-    isTouching,
+    isSwiping,
     isPaused,
-    activeConjunctions,
-    matchingPlanetIds,
+    swipeRay,
+    alignments,
     removingPlanetIds,
     newPlanetIds,
     swapPair,
     selectPlanet,
-    handleDragStart,
-    handleDragUpdate,
-    handleDragEnd,
+    startSwipe,
+    updateSwipe,
+    endSwipe,
     onSwapComplete,
-    setIsTouching,
     setRotationAngles,
   } = game;
 
@@ -38,6 +43,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
   const centerY = boardSize / 2;
   const animFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const alignmentTickRef = useRef<number>(0);
 
   // Orbital rotation loop
   useEffect(() => {
@@ -48,15 +54,25 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       const dt = (time - lastTimeRef.current) / 1000;
       lastTimeRef.current = time;
 
-      if (!isTouching && !isPaused) {
+      if (!isPaused) {
+        const speedMultiplier = isSwiping ? ROTATION_SLOWDOWN : 1;
         setRotationAngles((prev: number[]) => {
           const next = [...prev];
           for (let i = 0; i < ORBIT_CONFIGS.length; i++) {
             const config = ORBIT_CONFIGS[i];
-            next[i] += (config.rotationDirection * 360 * dt) / config.rotationDuration;
+            next[i] +=
+              (config.rotationDirection * 360 * dt * speedMultiplier) /
+              config.rotationDuration;
           }
           return next;
         });
+      }
+
+      // Update alignments every ~200ms
+      alignmentTickRef.current += dt;
+      if (alignmentTickRef.current > 0.2) {
+        alignmentTickRef.current = 0;
+        // Alignment updates happen via the hook
       }
 
       animFrameRef.current = requestAnimationFrame(animate);
@@ -67,7 +83,34 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       lastTimeRef.current = 0;
     };
-  }, [state.phase, isTouching, isPaused]);
+  }, [state.phase, isPaused, isSwiping]);
+
+  // Swipe gesture — starts from star center area
+  const panGesture = Gesture.Pan()
+    .onStart((event) => {
+      const dx = event.x - centerX;
+      const dy = event.y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // Must start near the star
+      if (dist < STAR_HITZONE) {
+        startSwipe();
+      }
+    })
+    .onUpdate((event) => {
+      if (!isSwiping && !swipeRay.active) return;
+      const dx = event.x - centerX;
+      const dy = event.y - centerY;
+      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      updateSwipe(normalizeAngle(angle));
+    })
+    .onEnd(() => {
+      endSwipe();
+    })
+    .onFinalize(() => {
+      if (isSwiping || swipeRay.active) {
+        endSwipe();
+      }
+    });
 
   const getSwapTarget = useCallback(
     (planet: Planet): { x: number; y: number } | null => {
@@ -95,78 +138,75 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     [swapPair, centerX, centerY, rotationAngles]
   );
 
-  const activeSpokeAngle =
-    activeConjunctions.length > 0 ? activeConjunctions[0].spokeAngle : null;
+  // Determine which planets are hit by the ray
+  const rayHitIds = new Set(
+    swipeRay.active && swipeRay.matchType
+      ? swipeRay.hitPlanets
+          .filter((p) => p.type === swipeRay.matchType)
+          .map((p) => p.id)
+      : []
+  );
 
   return (
-    <View style={[styles.container, { width: boardSize, height: boardSize }]}>
-      {/* Background rings and spokes */}
-      <OrbitalRings
-        centerX={centerX}
-        centerY={centerY}
-        width={boardSize}
-        height={boardSize}
-        activeSpokeAngle={activeSpokeAngle}
-      />
+    <GestureDetector gesture={panGesture}>
+      <View style={[styles.container, { width: boardSize, height: boardSize }]}>
+        {/* Background rings and spokes */}
+        <OrbitalRings
+          centerX={centerX}
+          centerY={centerY}
+          width={boardSize}
+          height={boardSize}
+          activeSpokeAngle={null}
+        />
 
-      {/* Central star */}
-      <StarCore centerX={centerX} centerY={centerY} />
-
-      {/* Conjunction beams */}
-      {activeConjunctions.map((c, i) => (
-        <ConjunctionBeam
-          key={`beam-${i}`}
-          spokeAngle={c.spokeAngle}
+        {/* Alignment indicators */}
+        <AlignmentLines
+          alignments={alignments}
+          rotationAngles={rotationAngles}
           centerX={centerX}
           centerY={centerY}
           width={boardSize}
           height={boardSize}
         />
-      ))}
 
-      {/* Planets */}
-      {state.planets.map((planet) => (
-        <PlanetView
-          key={planet.id}
-          planet={planet}
+        {/* Central star */}
+        <StarCore centerX={centerX} centerY={centerY} />
+
+        {/* Swipe ray beam */}
+        <SwipeRayBeam
+          swipeRay={swipeRay}
           centerX={centerX}
           centerY={centerY}
-          rotationAngle={rotationAngles[planet.orbitIndex]}
-          isSelected={state.selectedPlanetId === planet.id}
-          isMatching={matchingPlanetIds.has(planet.id)}
-          isRemoving={removingPlanetIds.has(planet.id)}
-          isNew={newPlanetIds.has(planet.id)}
-          onTap={selectPlanet}
-          onDragStart={(p) => {
-            setIsTouching(true);
-            handleDragStart(p);
-          }}
-          onDragUpdate={handleDragUpdate}
-          onDragEnd={(p) => {
-            setIsTouching(false);
-            handleDragEnd(p);
-          }}
-          swapTarget={getSwapTarget(planet)}
-          onSwapComplete={
-            swapPair && planet.id === swapPair.a.id ? onSwapComplete : undefined
-          }
+          width={boardSize}
+          height={boardSize}
         />
-      ))}
 
-      {/* Cascade popup */}
-      {state.cascadeLevel >= 2 && (
-        <CascadePopup
-          level={state.cascadeLevel}
-          centerX={centerX}
-          centerY={centerY}
-        />
-      )}
+        {/* Planets */}
+        {state.planets.map((planet) => (
+          <PlanetView
+            key={planet.id}
+            planet={planet}
+            centerX={centerX}
+            centerY={centerY}
+            rotationAngle={rotationAngles[planet.orbitIndex]}
+            isSelected={state.selectedPlanetId === planet.id}
+            isRemoving={removingPlanetIds.has(planet.id)}
+            isNew={newPlanetIds.has(planet.id)}
+            isRayHit={rayHitIds.has(planet.id)}
+            onTap={selectPlanet}
+            swapTarget={getSwapTarget(planet)}
+            onSwapComplete={
+              swapPair && planet.id === swapPair.a.id ? onSwapComplete : undefined
+            }
+          />
+        ))}
 
-      {/* Cryo freeze overlay */}
-      {state.powerUps.find((p) => p.type === 'CRYO_FREEZE' && p.active) && (
-        <View style={styles.cryoOverlay} pointerEvents="none" />
-      )}
-    </View>
+        {/* Freeze overlay */}
+        {state.powerUps.find((p) => p.type === 'STAR_FREEZE' && p.active) && (
+          <View style={styles.freezeOverlay} pointerEvents="none" />
+        )}
+      </View>
+    </GestureDetector>
   );
 };
 
@@ -175,7 +215,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  cryoOverlay: {
+  freezeOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(52, 152, 219, 0.08)',
     borderRadius: 999,
