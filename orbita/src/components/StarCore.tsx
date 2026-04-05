@@ -77,8 +77,6 @@ export const StarCore: React.FC<Props> = ({ centerX, centerY, timeRatio }) => {
 
   return (
     <>
-      {/* Outer soft glow */}
-      <Animated.View style={glowStyle} pointerEvents="none" />
       {/* Core star */}
       <Animated.View style={[styles.container, coreStyle, { width: displaySize, height: displaySize }]} pointerEvents="none">
         <Svg width={displaySize} height={displaySize}>
