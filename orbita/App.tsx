@@ -131,11 +131,19 @@ function GameScreen() {
             <GameBoard game={game} boardSize={boardSize} />
           </View>
 
-          {/* Bottom: Power-ups + Progress */}
+          {/* Bottom: Power-ups + Progress with gradient fade */}
+          <View style={styles.bottomGradient} pointerEvents="none">
+            {[0, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 1].map((opacity, i) => (
+              <View
+                key={i}
+                style={{
+                  flex: 1,
+                  backgroundColor: `rgba(6, 8, 24, ${opacity})`,
+                }}
+              />
+            ))}
+          </View>
           <View style={styles.bottomPanel}>
-            {/* Gradient fade effect using layered Views */}
-            <View style={styles.gradientTop} pointerEvents="none" />
-            <View style={styles.gradientMid} pointerEvents="none" />
             <PowerUpPanel
               powerUps={state.powerUps}
               onUsePowerUp={usePowerUp}
@@ -345,33 +353,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  bottomGradient: {
+    height: 40,
+    flexDirection: 'column',
+  },
   bottomPanel: {
     paddingHorizontal: 16,
     paddingBottom: 16,
     backgroundColor: '#060818',
-  },
-  gradientTop: {
-    position: 'absolute',
-    top: -30,
-    left: 0,
-    right: 0,
-    height: 30,
-    backgroundColor: 'rgba(6, 8, 24, 0.0)',
-    borderTopWidth: 0,
-    // Fake gradient: shadow trick
-    shadowColor: '#060818',
-    shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 1,
-    shadowRadius: 15,
-    elevation: 20,
-  },
-  gradientMid: {
-    position: 'absolute',
-    top: -15,
-    left: 0,
-    right: 0,
-    height: 15,
-    backgroundColor: 'rgba(6, 8, 24, 0.6)',
   },
   progressBarContainer: {
     height: 4,
