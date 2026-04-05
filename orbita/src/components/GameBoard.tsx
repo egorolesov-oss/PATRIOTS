@@ -39,6 +39,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     onSwipeEnd,
     setRotationAngles,
     updateIndicators,
+    tickTimer,
   } = game;
 
   const centerX = boardSize / 2;
@@ -56,7 +57,10 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       lastTimeRef.current = time;
 
       if (!isPaused) {
-        const speed = isSwiping ? ROTATION_SLOWDOWN : 1;
+        // Accelerate rotation as star dies (last 25% = 1.5x speed)
+        const timeRatio = state.timeLeft / state.totalTime;
+        const urgency = timeRatio < 0.25 ? 1.5 : timeRatio < 0.5 ? 1.2 : 1;
+        const speed = (isSwiping ? ROTATION_SLOWDOWN : 1) * urgency;
         setRotationAngles((prev: number[]) => {
           const next = [...prev];
           for (let i = 0; i < ORBIT_CONFIGS.length; i++) {
@@ -65,6 +69,8 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
           }
           return next;
         });
+        // Tick game timer
+        tickTimer(dt);
       }
 
       tickRef.current += dt;
@@ -218,7 +224,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
           })}
         </Svg>
 
-        <StarCore centerX={centerX} centerY={centerY} />
+        <StarCore centerX={centerX} centerY={centerY} timeRatio={state.timeLeft / state.totalTime} />
 
         {state.planets.map((planet) => (
           <PlanetView

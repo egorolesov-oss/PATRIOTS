@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Sounds } from '../engine/sounds';
 import {
   GameState,
@@ -7,6 +7,8 @@ import {
   PowerUpState,
   SwipeState,
   INITIAL_SWAPS,
+  LEVEL_TIME,
+  RESCUE_TARGET,
   ORBIT_CONFIGS,
 } from '../types/game';
 import {
@@ -15,9 +17,7 @@ import {
   findProximityPairs,
   canSwapPlanets,
   isValidSwipe,
-  calculateScore,
   biasedFillEmptySlots,
-  shufflePlanets,
   AlignedTriple,
   ProximityPair,
 } from '../engine/board';
@@ -47,18 +47,22 @@ export interface UseGameStateReturn {
   usePowerUp: (type: PowerUpType) => void;
   setRotationAngles: React.Dispatch<React.SetStateAction<number[]>>;
   updateIndicators: () => void;
+  tickTimer: (dt: number) => void;
 }
 
 export function useGameState(): UseGameStateReturn {
   const [state, setState] = useState<GameState>({
     planets: [],
-    score: 0,
+    rescued: 0,
+    rescueTarget: RESCUE_TARGET,
     swapsLeft: INITIAL_SWAPS,
     selectedPlanetId: null,
     phase: 'title',
     powerUps: initialPowerUps.map((p) => ({ ...p })),
     combo: 0,
-    bestScore: 0,
+    bestRescued: 0,
+    timeLeft: LEVEL_TIME,
+    totalTime: LEVEL_TIME,
   });
 
   const [rotationAngles, setRotationAngles] = useState([0, 0, 0]);
@@ -78,7 +82,6 @@ export function useGameState(): UseGameStateReturn {
   const processingRef = useRef(false);
   const freezeActiveRef = useRef(false);
   const freezeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastMatchTimeRef = useRef<number>(Date.now());
   const stateRef = useRef(state);
   stateRef.current = state;
   const rotationAnglesRef = useRef(rotationAngles);
@@ -93,21 +96,42 @@ export function useGameState(): UseGameStateReturn {
     setProximityPairs(findProximityPairs(stateRef.current.planets, angles));
   }, []);
 
+  // Timer tick — called from GameBoard animation loop
+  const tickTimer = useCallback((dt: number) => {
+    if (stateRef.current.phase !== 'playing' || isPaused) return;
+    setState((prev) => {
+      const newTime = Math.max(0, prev.timeLeft - dt);
+      if (newTime <= 0) {
+        // Star explodes — game over
+        Sounds.gameOver();
+        return {
+          ...prev,
+          timeLeft: 0,
+          phase: 'gameover',
+          bestRescued: Math.max(prev.bestRescued, prev.rescued),
+        };
+      }
+      return { ...prev, timeLeft: newTime };
+    });
+  }, [isPaused]);
+
   const startGame = useCallback(() => {
     const planets = generateBoard();
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
     freezeActiveRef.current = false;
-    lastMatchTimeRef.current = Date.now();
     Sounds.gameStart();
     setState({
       planets,
-      score: 0,
+      rescued: 0,
+      rescueTarget: RESCUE_TARGET,
       swapsLeft: INITIAL_SWAPS,
       selectedPlanetId: null,
       phase: 'playing',
       powerUps: initialPowerUps.map((p) => ({ ...p })),
       combo: 0,
-      bestScore: stateRef.current.bestScore,
+      bestRescued: stateRef.current.bestRescued,
+      timeLeft: LEVEL_TIME,
+      totalTime: LEVEL_TIME,
     });
     setAlignedIds(new Set());
     setAlignedTriples([]);
@@ -121,7 +145,7 @@ export function useGameState(): UseGameStateReturn {
     processingRef.current = false;
   }, []);
 
-  // --- SWIPE through aligned planets across orbits ---
+  // --- SWIPE ---
 
   const onSwipeStart = useCallback((planet: Planet) => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
@@ -138,7 +162,6 @@ export function useGameState(): UseGameStateReturn {
   const onSwipeThrough = useCallback((planet: Planet) => {
     if (!swipe.active) return;
     if (planet.type !== swipe.matchType || swipe.collectedIds.includes(planet.id)) return;
-    // Must be on a different orbit
     const collectedPlanets = stateRef.current.planets.filter(
       (p) => swipe.collectedIds.includes(p.id)
     );
@@ -161,17 +184,15 @@ export function useGameState(): UseGameStateReturn {
       (p) => swipe.collectedIds.includes(p.id)
     );
 
-    // Only valid if all collected planets are currently aligned (lines visible)
     const currentAligned = alignedIds;
     const allAligned = collected.every((p) => currentAligned.has(p.id));
 
     if (isValidSwipe(collected) && allAligned) {
       processingRef.current = true;
       const matchIds = new Set(swipe.collectedIds);
+      const rescueCount = collected.length;
       const newCombo = stateRef.current.combo + 1;
-      const points = calculateScore(collected.length, newCombo);
 
-      // Sound
       if (newCombo >= 2) {
         Sounds.comboMatch(newCombo);
       } else {
@@ -183,7 +204,6 @@ export function useGameState(): UseGameStateReturn {
       setTimeout(() => {
         setState((prev) => {
           const remaining = prev.planets.filter((p) => !matchIds.has(p.id));
-          // Refill empty slots with biased spawning
           let filled = biasedFillEmptySlots(remaining);
           const newIds = new Set(
             filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
@@ -191,12 +211,26 @@ export function useGameState(): UseGameStateReturn {
           setNewPlanetIds(newIds);
           setRemovingPlanetIds(new Set());
           Sounds.spawn();
-          // Reset no-match timer
-          lastMatchTimeRef.current = Date.now();
+
+          const newRescued = prev.rescued + rescueCount;
+
+          // Check win condition
+          if (newRescued >= prev.rescueTarget) {
+            Sounds.gameStart(); // victory sound
+            return {
+              ...prev,
+              planets: filled,
+              rescued: newRescued,
+              combo: newCombo,
+              phase: 'won',
+              bestRescued: Math.max(prev.bestRescued, newRescued),
+            };
+          }
+
           return {
             ...prev,
             planets: filled,
-            score: prev.score + points,
+            rescued: newRescued,
             combo: newCombo,
           };
         });
@@ -215,7 +249,7 @@ export function useGameState(): UseGameStateReturn {
     setSwipe({ active: false, orbitIndex: -1, collectedIds: [], matchType: null });
   }, [swipe, alignedIds]);
 
-  // --- CROSS-ORBIT TAP SWAP ---
+  // --- CROSS-ORBIT SWAP ---
 
   const selectPlanet = useCallback((planet: Planet) => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
@@ -238,9 +272,7 @@ export function useGameState(): UseGameStateReturn {
     const selectedPlanet = stateRef.current.planets.find((p) => p.id === currentSelected);
     if (!selectedPlanet) return;
 
-    // Cross-orbit swap: must be different orbit, adjacent, and close enough
     if (selectedPlanet.orbitIndex === planet.orbitIndex) {
-      // Same orbit — just re-select
       setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
       return;
     }
@@ -250,19 +282,13 @@ export function useGameState(): UseGameStateReturn {
       return;
     }
 
-    // Check proximity
     if (!canSwapPlanets(selectedPlanet, planet, rotationAnglesRef.current)) {
-      // Too far apart — re-select
       setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
       return;
     }
 
     // Valid cross-orbit swap!
-    const isLastSwap = stateRef.current.swapsLeft <= 1;
     Sounds.swap();
-    if (isLastSwap) {
-      setTimeout(() => Sounds.gameOver(), 400);
-    }
     setState((prev) => {
       const planets = prev.planets.map((p) => {
         if (p.id === selectedPlanet.id) {
@@ -274,22 +300,11 @@ export function useGameState(): UseGameStateReturn {
         return p;
       });
 
-      const newSwaps = prev.swapsLeft - 1;
-      if (newSwaps <= 0) {
-        return {
-          ...prev,
-          planets,
-          selectedPlanetId: null,
-          swapsLeft: 0,
-          phase: 'gameover',
-          bestScore: Math.max(prev.bestScore, prev.score),
-        };
-      }
       return {
         ...prev,
         planets,
         selectedPlanetId: null,
-        swapsLeft: newSwaps,
+        swapsLeft: prev.swapsLeft - 1,
       };
     });
   }, [isSwiping]);
@@ -337,6 +352,7 @@ export function useGameState(): UseGameStateReturn {
         break;
       }
       case PowerUpType.NOVA_PULSE: {
+        Sounds.powerUp();
         setState((prev) => ({
           ...prev,
           powerUps: prev.powerUps.map((p) =>
@@ -386,5 +402,6 @@ export function useGameState(): UseGameStateReturn {
     usePowerUp,
     setRotationAngles,
     updateIndicators,
+    tickTimer,
   };
 }
