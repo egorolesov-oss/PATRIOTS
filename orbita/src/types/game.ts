@@ -45,7 +45,7 @@ export const ORBIT_CONFIGS: OrbitConfig[] = [
 export enum PowerUpType {
   STAR_FREEZE = 'STAR_FREEZE',
   NOVA_PULSE = 'NOVA_PULSE',
-  CLEANSE_RAY = 'CLEANSE_RAY',
+  ANTIGRAVITY = 'ANTIGRAVITY',
 }
 
 export interface PowerUpState {

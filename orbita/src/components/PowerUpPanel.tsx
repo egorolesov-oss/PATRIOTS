@@ -60,20 +60,27 @@ const PowerUpIcon: React.FC<{ type: PowerUpType; size: number }> = ({ type, size
         </Svg>
       );
     }
-    case PowerUpType.CLEANSE_RAY: {
-      // Lightning / ray
+    case PowerUpType.ANTIGRAVITY: {
+      // Shake / swirl arrows
       return (
         <Svg width={size} height={size}>
           <Path
-            d={`M ${half + 2} ${size * 0.1}
-                L ${half - 4} ${half}
-                L ${half + 2} ${half}
-                L ${half - 2} ${size * 0.9}`}
-            stroke="#e74c3c"
-            strokeWidth={2.5}
+            d={`M ${half - 6} ${half - 8}
+                Q ${half + 8} ${half - 12} ${half + 6} ${half - 2}
+                L ${half + 9} ${half - 5} L ${half + 3} ${half - 6} L ${half + 6} ${half - 2}`}
+            stroke="#2ecc71"
+            strokeWidth={2}
             fill="none"
             strokeLinecap="round"
-            strokeLinejoin="round"
+          />
+          <Path
+            d={`M ${half + 6} ${half + 8}
+                Q ${half - 8} ${half + 12} ${half - 6} ${half + 2}
+                L ${half - 9} ${half + 5} L ${half - 3} ${half + 6} L ${half - 6} ${half + 2}`}
+            stroke="#2ecc71"
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
           />
         </Svg>
       );
@@ -104,7 +111,7 @@ const PowerUpButton: React.FC<{
   const label = {
     [PowerUpType.STAR_FREEZE]: 'FREEZE',
     [PowerUpType.NOVA_PULSE]: 'PULSE',
-    [PowerUpType.CLEANSE_RAY]: 'BLAST',
+    [PowerUpType.ANTIGRAVITY]: 'SHAKE',
   }[powerUp.type];
 
   return (
