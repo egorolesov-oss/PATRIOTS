@@ -66,16 +66,7 @@ function GameScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.bgWrapper} pointerEvents="none">
-        {showTitle ? (
-          <>
-            <Image
-              source={require('./src/../assets/space-bg.png')}
-              style={styles.bgImage}
-              resizeMode="cover"
-            />
-            <StarField />
-          </>
-        ) : (
+        {!showTitle && (
           <Animated.View style={bgAnimStyle}>
             <Image
               source={require('./src/../assets/space-bg.png')}
