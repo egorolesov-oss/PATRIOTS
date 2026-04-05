@@ -155,7 +155,11 @@ export function useGameState(): UseGameStateReturn {
       (p) => swipe.collectedIds.includes(p.id)
     );
 
-    if (isValidSwipe(collected)) {
+    // Only valid if all collected planets are currently aligned (lines visible)
+    const currentAligned = alignedIds;
+    const allAligned = collected.every((p) => currentAligned.has(p.id));
+
+    if (isValidSwipe(collected) && allAligned) {
       processingRef.current = true;
       const matchIds = new Set(swipe.collectedIds);
       const newCombo = stateRef.current.combo + 1;
@@ -186,7 +190,7 @@ export function useGameState(): UseGameStateReturn {
 
     setIsSwiping(false);
     setSwipe({ active: false, orbitIndex: -1, collectedIds: [], matchType: null });
-  }, [swipe]);
+  }, [swipe, alignedIds]);
 
   // --- CROSS-ORBIT TAP SWAP ---
 
