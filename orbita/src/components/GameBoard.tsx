@@ -68,7 +68,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       }
 
       tickRef.current += dt;
-      if (tickRef.current > 0.2) {
+      if (tickRef.current > 0.1) {
         tickRef.current = 0;
         updateIndicators();
       }
