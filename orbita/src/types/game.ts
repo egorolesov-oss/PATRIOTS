@@ -15,12 +15,12 @@ export interface PlanetConfig {
 }
 
 export const PLANET_CONFIGS: Record<PlanetType, PlanetConfig> = {
-  [PlanetType.RED]: { type: PlanetType.RED, color: '#e74c3c', sprite: 'planet_red', size: 44 },
-  [PlanetType.GREEN]: { type: PlanetType.GREEN, color: '#2ecc71', sprite: 'planet_green', size: 40 },
-  [PlanetType.BLUE]: { type: PlanetType.BLUE, color: '#3498db', sprite: 'planet_blue', size: 48 },
-  [PlanetType.GOLD]: { type: PlanetType.GOLD, color: '#f1c40f', sprite: 'planet_gold', size: 36 },
+  [PlanetType.RED]: { type: PlanetType.RED, color: '#e74c3c', sprite: 'planet_red', size: 42 },
+  [PlanetType.GREEN]: { type: PlanetType.GREEN, color: '#2ecc71', sprite: 'planet_green', size: 42 },
+  [PlanetType.BLUE]: { type: PlanetType.BLUE, color: '#3498db', sprite: 'planet_blue', size: 42 },
+  [PlanetType.GOLD]: { type: PlanetType.GOLD, color: '#f1c40f', sprite: 'planet_gold', size: 42 },
   [PlanetType.PINK]: { type: PlanetType.PINK, color: '#e91e90', sprite: 'planet_pink', size: 42 },
-  [PlanetType.PURPLE]: { type: PlanetType.PURPLE, color: '#9b59b6', sprite: 'planet_purple', size: 46 },
+  [PlanetType.PURPLE]: { type: PlanetType.PURPLE, color: '#9b59b6', sprite: 'planet_purple', size: 42 },
 };
 
 export interface Planet {
