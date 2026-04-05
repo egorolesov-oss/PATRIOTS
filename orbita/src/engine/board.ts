@@ -2,9 +2,7 @@ import {
   Planet,
   PlanetType,
   ORBIT_CONFIGS,
-  SWIPE_TOLERANCE,
-  ALIGNMENT_FAR,
-  AlignmentIndicator,
+  OrbitMatch,
 } from '../types/game';
 
 const PLANET_TYPES = Object.values(PlanetType);
@@ -47,11 +45,6 @@ export function normalizeAngle(angle: number): number {
   return a;
 }
 
-export function angleDiff(a: number, b: number): number {
-  const diff = Math.abs(normalizeAngle(a) - normalizeAngle(b));
-  return Math.min(diff, 360 - diff);
-}
-
 export function randomPlanetType(): PlanetType {
   return PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
 }
@@ -73,173 +66,120 @@ export function generateBoard(): Planet[] {
   return planets;
 }
 
-/** Get the current angle of a planet (slot angle + orbit rotation) */
-export function getPlanetAngle(
-  planet: Planet,
-  rotationAngles: number[]
-): number {
-  return normalizeAngle(
-    getSlotAngle(planet.orbitIndex, planet.slotIndex) +
-      rotationAngles[planet.orbitIndex]
-  );
-}
-
 /**
- * Find planets hit by a ray at the given angle.
- * Returns planets within SWIPE_TOLERANCE degrees of the ray angle,
- * one per orbit (the closest to the ray on each orbit).
+ * Find all groups of 3+ adjacent same-type planets on each orbit.
+ * Orbits are circular, so slot 0 is adjacent to the last slot.
  */
-export function findPlanetsOnRay(
-  planets: Planet[],
-  rayAngle: number,
-  rotationAngles: number[]
-): Planet[] {
-  const hits: Planet[] = [];
+export function findOrbitMatches(planets: Planet[]): OrbitMatch[] {
+  const matches: OrbitMatch[] = [];
 
   for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
-    const orbitPlanets = planets.filter((p) => p.orbitIndex === oi);
-    let bestPlanet: Planet | null = null;
-    let bestDiff = Infinity;
-
-    for (const p of orbitPlanets) {
-      const pAngle = getPlanetAngle(p, rotationAngles);
-      const diff = angleDiff(pAngle, rayAngle);
-      if (diff < SWIPE_TOLERANCE && diff < bestDiff) {
-        bestDiff = diff;
-        bestPlanet = p;
+    const config = ORBIT_CONFIGS[oi];
+    const slotCount = config.slotCount;
+    // Build slot array for this orbit
+    const slots: (Planet | null)[] = new Array(slotCount).fill(null);
+    for (const p of planets) {
+      if (p.orbitIndex === oi) {
+        slots[p.slotIndex] = p;
       }
     }
 
-    if (bestPlanet) {
-      hits.push(bestPlanet);
+    // Find runs of same type (circular)
+    const visited = new Set<number>();
+    for (let start = 0; start < slotCount; start++) {
+      if (visited.has(start) || !slots[start]) continue;
+      const type = slots[start]!.type;
+      const group: Planet[] = [slots[start]!];
+      visited.add(start);
+
+      // Expand forward
+      let next = (start + 1) % slotCount;
+      while (next !== start && slots[next] && slots[next]!.type === type) {
+        group.push(slots[next]!);
+        visited.add(next);
+        next = (next + 1) % slotCount;
+      }
+
+      if (group.length >= 3) {
+        matches.push({ orbitIndex: oi, planets: group, type });
+      }
     }
   }
 
-  return hits;
+  return matches;
 }
 
 /**
- * From a list of hit planets, find the best matching group:
- * the most numerous same-type group that spans 2+ orbits.
+ * Check if a planet belongs to any match group (for highlighting).
  */
-export function findBestMatch(hitPlanets: Planet[]): {
-  matchedPlanets: Planet[];
-  matchType: PlanetType | null;
-} {
-  if (hitPlanets.length < 2) return { matchedPlanets: [], matchType: null };
-
-  const byType: Record<string, Planet[]> = {};
-  for (const p of hitPlanets) {
-    if (!byType[p.type]) byType[p.type] = [];
-    byType[p.type].push(p);
-  }
-
-  let bestType: PlanetType | null = null;
-  let bestGroup: Planet[] = [];
-
-  for (const type of Object.keys(byType)) {
-    const group = byType[type];
-    const orbits = new Set(group.map((p) => p.orbitIndex));
-    if (orbits.size >= 2 && group.length > bestGroup.length) {
-      bestType = type as PlanetType;
-      bestGroup = group;
+export function findMatchingPlanetIds(planets: Planet[]): Set<string> {
+  const matches = findOrbitMatches(planets);
+  const ids = new Set<string>();
+  for (const m of matches) {
+    for (const p of m.planets) {
+      ids.add(p.id);
     }
   }
-
-  return { matchedPlanets: bestGroup, matchType: bestType };
+  return ids;
 }
 
 /**
- * Find all current alignment indicators — pairs/triples of same-type
- * planets that are close to radial alignment across orbits.
+ * Check if a set of planet IDs forms a valid swipe
+ * (all same type, all adjacent on the same orbit, 3+ planets).
  */
-export function findAlignments(
+export function isValidSwipe(
   planets: Planet[],
-  rotationAngles: number[]
-): AlignmentIndicator[] {
-  const indicators: AlignmentIndicator[] = [];
+  collectedIds: string[]
+): boolean {
+  if (collectedIds.length < 3) return false;
 
-  // Group planets by type
-  const byType: Record<string, Planet[]> = {};
-  for (const p of planets) {
-    if (!byType[p.type]) byType[p.type] = [];
-    byType[p.type].push(p);
+  const collected = planets.filter((p) => collectedIds.includes(p.id));
+  if (collected.length < 3) return false;
+
+  // All same type
+  const type = collected[0].type;
+  if (!collected.every((p) => p.type === type)) return false;
+
+  // All same orbit
+  const orbit = collected[0].orbitIndex;
+  if (!collected.every((p) => p.orbitIndex === orbit)) return false;
+
+  // All adjacent
+  const slotCount = ORBIT_CONFIGS[orbit].slotCount;
+  const slotSet = new Set(collected.map((p) => p.slotIndex));
+  const sortedSlots = [...slotSet].sort((a, b) => a - b);
+
+  // Check if consecutive (accounting for circular wrap)
+  let consecutive = true;
+  for (let i = 1; i < sortedSlots.length; i++) {
+    if (sortedSlots[i] - sortedSlots[i - 1] !== 1) {
+      consecutive = false;
+      break;
+    }
   }
-
-  for (const type of Object.keys(byType)) {
-    const group = byType[type];
-    // Check all pairs across different orbits
-    for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        if (group[i].orbitIndex === group[j].orbitIndex) continue;
-
-        const angleI = getPlanetAngle(group[i], rotationAngles);
-        const angleJ = getPlanetAngle(group[j], rotationAngles);
-        const diff = angleDiff(angleI, angleJ);
-
-        if (diff < ALIGNMENT_FAR) {
-          // Check if a third planet on remaining orbit also aligns
-          const usedOrbits = new Set([group[i].orbitIndex, group[j].orbitIndex]);
-          const avgAngle = normalizeAngle(
-            (angleI + angleJ) / 2
-          );
-          let triple: Planet | null = null;
-
-          for (let k = 0; k < group.length; k++) {
-            if (k === i || k === j) continue;
-            if (usedOrbits.has(group[k].orbitIndex)) continue;
-            const angleK = getPlanetAngle(group[k], rotationAngles);
-            if (angleDiff(angleK, avgAngle) < ALIGNMENT_FAR) {
-              triple = group[k];
-              break;
-            }
-          }
-
-          const alignedPlanets = [group[i], group[j]];
-          if (triple) alignedPlanets.push(triple);
-
-          indicators.push({
-            type: type as PlanetType,
-            planets: alignedPlanets,
-            angleDiff: diff,
-          });
-        }
+  // Check wrap-around case (e.g., slots 0,1,9 on 10-slot orbit)
+  if (!consecutive && sortedSlots.length >= 3) {
+    const wrapCheck = sortedSlots[sortedSlots.length - 1] - sortedSlots[0] === slotCount - 1;
+    if (wrapCheck) {
+      // Check if the gap is exactly at one point
+      let gapCount = 0;
+      for (let i = 1; i < sortedSlots.length; i++) {
+        if (sortedSlots[i] - sortedSlots[i - 1] !== 1) gapCount++;
       }
+      consecutive = gapCount === 1;
     }
   }
 
-  // Deduplicate: keep only the tightest alignment for each planet
-  const usedIds = new Set<string>();
-  const unique: AlignmentIndicator[] = [];
-  indicators.sort((a, b) => a.angleDiff - b.angleDiff);
-  for (const ind of indicators) {
-    const newPlanets = ind.planets.filter((p) => !usedIds.has(p.id));
-    const orbits = new Set(newPlanets.map((p) => p.orbitIndex));
-    if (orbits.size >= 2) {
-      for (const p of newPlanets) usedIds.add(p.id);
-      unique.push({ ...ind, planets: newPlanets });
-    }
-  }
-
-  return unique;
+  return consecutive;
 }
 
-export function calculateSwipeScore(
-  matchCount: number,
-  allThreeOrbits: boolean,
-  perfectAlignment: boolean,
-  combo: number
-): number {
-  let base = matchCount === 2 ? 200 : 500;
-  if (perfectAlignment) base = Math.round(base * 1.25);
-
-  // Combo multiplier
+export function calculateScore(matchCount: number, combo: number): number {
+  const base = matchCount === 3 ? 300 : matchCount === 4 ? 600 : 1000;
   let multiplier = 1;
-  if (combo >= 5) multiplier = 3;
-  else if (combo >= 4) multiplier = 2.5;
-  else if (combo >= 3) multiplier = 2;
-  else if (combo >= 2) multiplier = 1.5;
-
+  if (combo >= 4) multiplier = 3;
+  else if (combo >= 3) multiplier = 2.5;
+  else if (combo >= 2) multiplier = 2;
+  else if (combo >= 1) multiplier = 1.5;
   return Math.round(base * multiplier);
 }
 

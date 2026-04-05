@@ -3,16 +3,15 @@ import { View, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   ORBIT_CONFIGS,
-  STAR_HITZONE,
+  PLANET_SIZE,
+  PLANET_HITBOX,
   ROTATION_SLOWDOWN,
   Planet,
 } from '../types/game';
-import { getSlotPosition, normalizeAngle } from '../engine/board';
+import { getSlotPosition } from '../engine/board';
 import { StarCore } from './StarCore';
 import { OrbitalRings } from './OrbitalRings';
 import { PlanetView } from './PlanetView';
-import { SwipeRayBeam } from './SwipeRayBeam';
-import { AlignmentLines } from './AlignmentLines';
 import { UseGameStateReturn } from '../hooks/useGameState';
 
 interface Props {
@@ -26,26 +25,27 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     rotationAngles,
     isSwiping,
     isPaused,
-    swipeRay,
-    alignments,
+    swipe,
+    matchableIds,
     removingPlanetIds,
     newPlanetIds,
     swapPair,
     selectPlanet,
-    startSwipe,
-    updateSwipe,
-    endSwipe,
+    onSwipeStart,
+    onSwipeThrough,
+    onSwipeEnd,
     onSwapComplete,
     setRotationAngles,
+    updateMatchables,
   } = game;
 
   const centerX = boardSize / 2;
   const centerY = boardSize / 2;
   const animFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
-  const alignmentTickRef = useRef<number>(0);
+  const matchTickRef = useRef<number>(0);
 
-  // Orbital rotation loop
+  // Orbital rotation + matchable updates
   useEffect(() => {
     if (state.phase !== 'playing') return;
 
@@ -55,24 +55,22 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       lastTimeRef.current = time;
 
       if (!isPaused) {
-        const speedMultiplier = isSwiping ? ROTATION_SLOWDOWN : 1;
+        const speed = isSwiping ? ROTATION_SLOWDOWN : 1;
         setRotationAngles((prev: number[]) => {
           const next = [...prev];
           for (let i = 0; i < ORBIT_CONFIGS.length; i++) {
             const config = ORBIT_CONFIGS[i];
-            next[i] +=
-              (config.rotationDirection * 360 * dt * speedMultiplier) /
-              config.rotationDuration;
+            next[i] += (config.rotationDirection * 360 * dt * speed) / config.rotationDuration;
           }
           return next;
         });
       }
 
-      // Update alignments every ~200ms
-      alignmentTickRef.current += dt;
-      if (alignmentTickRef.current > 0.2) {
-        alignmentTickRef.current = 0;
-        // Alignment updates happen via the hook
+      // Update matchable highlights every ~300ms
+      matchTickRef.current += dt;
+      if (matchTickRef.current > 0.3) {
+        matchTickRef.current = 0;
+        updateMatchables();
       }
 
       animFrameRef.current = requestAnimationFrame(animate);
@@ -85,52 +83,79 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     };
   }, [state.phase, isPaused, isSwiping]);
 
-  // Swipe gesture — starts from star center area
+  // Find nearest planet to a touch point
+  const findNearestPlanet = useCallback(
+    (touchX: number, touchY: number): Planet | null => {
+      let best: Planet | null = null;
+      let bestDist = PLANET_HITBOX;
+
+      for (const planet of state.planets) {
+        const pos = getSlotPosition(
+          planet.orbitIndex,
+          planet.slotIndex,
+          centerX,
+          centerY,
+          rotationAngles[planet.orbitIndex]
+        );
+        const dx = touchX - pos.x;
+        const dy = touchY - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = planet;
+        }
+      }
+
+      return best;
+    },
+    [state.planets, centerX, centerY, rotationAngles]
+  );
+
+  // Pan gesture for swiping through planets
   const panGesture = Gesture.Pan()
     .onStart((event) => {
-      const dx = event.x - centerX;
-      const dy = event.y - centerY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      // Must start near the star
-      if (dist < STAR_HITZONE) {
-        startSwipe();
+      const planet = findNearestPlanet(event.x, event.y);
+      if (planet) {
+        onSwipeStart(planet);
       }
     })
     .onUpdate((event) => {
-      if (!isSwiping && !swipeRay.active) return;
-      const dx = event.x - centerX;
-      const dy = event.y - centerY;
-      const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-      updateSwipe(normalizeAngle(angle));
+      if (!swipe.active) return;
+      const planet = findNearestPlanet(event.x, event.y);
+      if (planet) {
+        onSwipeThrough(planet);
+      }
     })
     .onEnd(() => {
-      endSwipe();
+      onSwipeEnd();
     })
     .onFinalize(() => {
-      if (isSwiping || swipeRay.active) {
-        endSwipe();
-      }
+      onSwipeEnd();
     });
+
+  // Tap gesture for selecting/swapping planets
+  const tapGesture = Gesture.Tap().onEnd((event) => {
+    const planet = findNearestPlanet(event.x, event.y);
+    if (planet) {
+      selectPlanet(planet);
+    }
+  });
+
+  const composed = Gesture.Exclusive(panGesture, tapGesture);
 
   const getSwapTarget = useCallback(
     (planet: Planet): { x: number; y: number } | null => {
       if (!swapPair) return null;
       if (planet.id === swapPair.a.id) {
         return getSlotPosition(
-          swapPair.b.orbitIndex,
-          swapPair.b.slotIndex,
-          centerX,
-          centerY,
-          rotationAngles[swapPair.b.orbitIndex]
+          swapPair.b.orbitIndex, swapPair.b.slotIndex,
+          centerX, centerY, rotationAngles[swapPair.b.orbitIndex]
         );
       }
       if (planet.id === swapPair.b.id) {
         return getSlotPosition(
-          swapPair.a.orbitIndex,
-          swapPair.a.slotIndex,
-          centerX,
-          centerY,
-          rotationAngles[swapPair.a.orbitIndex]
+          swapPair.a.orbitIndex, swapPair.a.slotIndex,
+          centerX, centerY, rotationAngles[swapPair.a.orbitIndex]
         );
       }
       return null;
@@ -138,19 +163,11 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     [swapPair, centerX, centerY, rotationAngles]
   );
 
-  // Determine which planets are hit by the ray
-  const rayHitIds = new Set(
-    swipeRay.active && swipeRay.matchType
-      ? swipeRay.hitPlanets
-          .filter((p) => p.type === swipeRay.matchType)
-          .map((p) => p.id)
-      : []
-  );
+  const collectedSet = new Set(swipe.collectedIds);
 
   return (
-    <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={composed}>
       <View style={[styles.container, { width: boardSize, height: boardSize }]}>
-        {/* Background rings and spokes */}
         <OrbitalRings
           centerX={centerX}
           centerY={centerY}
@@ -159,29 +176,8 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
           activeSpokeAngle={null}
         />
 
-        {/* Alignment indicators */}
-        <AlignmentLines
-          alignments={alignments}
-          rotationAngles={rotationAngles}
-          centerX={centerX}
-          centerY={centerY}
-          width={boardSize}
-          height={boardSize}
-        />
-
-        {/* Central star */}
         <StarCore centerX={centerX} centerY={centerY} />
 
-        {/* Swipe ray beam */}
-        <SwipeRayBeam
-          swipeRay={swipeRay}
-          centerX={centerX}
-          centerY={centerY}
-          width={boardSize}
-          height={boardSize}
-        />
-
-        {/* Planets */}
         {state.planets.map((planet) => (
           <PlanetView
             key={planet.id}
@@ -192,7 +188,8 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
             isSelected={state.selectedPlanetId === planet.id}
             isRemoving={removingPlanetIds.has(planet.id)}
             isNew={newPlanetIds.has(planet.id)}
-            isRayHit={rayHitIds.has(planet.id)}
+            isMatchable={matchableIds.has(planet.id)}
+            isCollected={collectedSet.has(planet.id)}
             onTap={selectPlanet}
             swapTarget={getSwapTarget(planet)}
             onSwapComplete={
@@ -201,7 +198,6 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
           />
         ))}
 
-        {/* Freeze overlay */}
         {state.powerUps.find((p) => p.type === 'STAR_FREEZE' && p.active) && (
           <View style={styles.freezeOverlay} pointerEvents="none" />
         )}
