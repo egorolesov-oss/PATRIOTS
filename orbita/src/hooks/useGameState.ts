@@ -90,18 +90,6 @@ export function useGameState(): UseGameStateReturn {
     setAlignedIds(result.ids);
     setAlignedTriples(result.triples);
     setProximityPairs(findProximityPairs(stateRef.current.planets, angles));
-
-    // Game over: no swaps left + 15 seconds without a match
-    if (
-      stateRef.current.swapsLeft <= 0 &&
-      Date.now() - lastMatchTimeRef.current > 15000
-    ) {
-      setState((prev) => ({
-        ...prev,
-        phase: 'gameover',
-        bestScore: Math.max(prev.bestScore, prev.score),
-      }));
-    }
   }, []);
 
   const startGame = useCallback(() => {
@@ -269,11 +257,22 @@ export function useGameState(): UseGameStateReturn {
         return p;
       });
 
+      const newSwaps = prev.swapsLeft - 1;
+      if (newSwaps <= 0) {
+        return {
+          ...prev,
+          planets,
+          selectedPlanetId: null,
+          swapsLeft: 0,
+          phase: 'gameover',
+          bestScore: Math.max(prev.bestScore, prev.score),
+        };
+      }
       return {
         ...prev,
         planets,
         selectedPlanetId: null,
-        swapsLeft: prev.swapsLeft - 1,
+        swapsLeft: newSwaps,
       };
     });
   }, [isSwiping]);
