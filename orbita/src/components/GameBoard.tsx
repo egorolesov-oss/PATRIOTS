@@ -61,7 +61,8 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
         // Accelerate rotation as star dies (last 25% = 1.5x speed)
         const timeRatio = state.timeLeft / state.totalTime;
         const urgency = timeRatio < 0.25 ? 1.5 : timeRatio < 0.5 ? 1.2 : 1;
-        const speed = (isSwiping ? ROTATION_SLOWDOWN : 1) * urgency;
+        const levelSpeed = game.currentLevel?.speedMultiplier || 1;
+        const speed = (isSwiping ? ROTATION_SLOWDOWN : 1) * urgency * levelSpeed;
         setRotationAngles((prev: number[]) => {
           const next = [...prev];
           for (let i = 0; i < ORBIT_CONFIGS.length; i++) {

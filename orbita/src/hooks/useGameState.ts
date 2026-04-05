@@ -6,11 +6,9 @@ import {
   PowerUpType,
   PowerUpState,
   SwipeState,
-  INITIAL_SWAPS,
-  LEVEL_TIME,
-  RESCUE_TARGET,
   ORBIT_CONFIGS,
 } from '../types/game';
+import { LevelConfig, LEVELS } from '../types/levels';
 import {
   generateBoard,
   findAlignedGroups,
@@ -22,11 +20,13 @@ import {
   ProximityPair,
 } from '../engine/board';
 
-const initialPowerUps: PowerUpState[] = [
-  { type: PowerUpType.STAR_FREEZE, used: false, active: false },
-  { type: PowerUpType.NOVA_PULSE, used: false, active: false },
-  { type: PowerUpType.ANTIGRAVITY, used: false, active: false },
-];
+function makePowerUps(level: LevelConfig): PowerUpState[] {
+  return level.powerUps.map((p) => ({
+    type: p.type,
+    used: false,
+    active: false,
+  }));
+}
 
 export interface UseGameStateReturn {
   state: GameState;
@@ -40,6 +40,10 @@ export interface UseGameStateReturn {
   removingPlanetIds: Set<string>;
   newPlanetIds: Set<string>;
   antigravityActive: boolean;
+  currentLevel: LevelConfig;
+  levelStars: number[];
+  maxUnlockedLevel: number;
+  startLevel: (levelId: number) => void;
   startGame: () => void;
   selectPlanet: (planet: Planet) => void;
   onSwipeStart: (planet: Planet) => void;
@@ -52,18 +56,22 @@ export interface UseGameStateReturn {
 }
 
 export function useGameState(): UseGameStateReturn {
+  const [currentLevel, setCurrentLevel] = useState<LevelConfig>(LEVELS[0]);
+  const [levelStars, setLevelStars] = useState<number[]>(new Array(LEVELS.length).fill(0));
+  const [maxUnlockedLevel, setMaxUnlockedLevel] = useState(1);
+
   const [state, setState] = useState<GameState>({
     planets: [],
     rescued: 0,
-    rescueTarget: RESCUE_TARGET,
-    swapsLeft: INITIAL_SWAPS,
+    rescueTarget: currentLevel.rescueTarget,
+    swapsLeft: currentLevel.swaps,
     selectedPlanetId: null,
     phase: 'title',
-    powerUps: initialPowerUps.map((p) => ({ ...p })),
+    powerUps: makePowerUps(currentLevel),
     combo: 0,
     bestRescued: 0,
-    timeLeft: LEVEL_TIME,
-    totalTime: LEVEL_TIME,
+    timeLeft: currentLevel.time,
+    totalTime: currentLevel.time,
   });
 
   const [rotationAngles, setRotationAngles] = useState([0, 0, 0]);
@@ -92,7 +100,7 @@ export function useGameState(): UseGameStateReturn {
   const updateIndicators = useCallback(() => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
     const angles = rotationAnglesRef.current;
-    const result = findAlignedGroups(stateRef.current.planets, angles, 28);
+    const result = findAlignedGroups(stateRef.current.planets, angles, currentLevel.alignmentTolerance);
     setAlignedIds(result.ids);
     setAlignedTriples(result.triples);
     setProximityPairs(findProximityPairs(stateRef.current.planets, angles));
@@ -135,8 +143,10 @@ export function useGameState(): UseGameStateReturn {
     });
   }, [isPaused]);
 
-  const startGame = useCallback(() => {
-    const planets = generateBoard();
+  const startLevel = useCallback((levelId: number) => {
+    const level = LEVELS.find((l) => l.id === levelId) || LEVELS[0];
+    setCurrentLevel(level);
+    const planets = generateBoard(level.planetTypes);
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
     freezeActiveRef.current = false;
     Sounds.gameStart();
@@ -144,15 +154,15 @@ export function useGameState(): UseGameStateReturn {
     setState({
       planets,
       rescued: 0,
-      rescueTarget: RESCUE_TARGET,
-      swapsLeft: INITIAL_SWAPS,
+      rescueTarget: level.rescueTarget,
+      swapsLeft: level.swaps,
       selectedPlanetId: null,
       phase: 'playing',
-      powerUps: initialPowerUps.map((p) => ({ ...p })),
+      powerUps: makePowerUps(level),
       combo: 0,
       bestRescued: stateRef.current.bestRescued,
-      timeLeft: LEVEL_TIME,
-      totalTime: LEVEL_TIME,
+      timeLeft: level.time,
+      totalTime: level.time,
     });
     setAlignedIds(new Set());
     setAlignedTriples([]);
@@ -165,6 +175,10 @@ export function useGameState(): UseGameStateReturn {
     setSwipe({ active: false, orbitIndex: -1, collectedIds: [], matchType: null });
     processingRef.current = false;
   }, []);
+
+  const startGame = useCallback(() => {
+    startLevel(currentLevel.id);
+  }, [currentLevel, startLevel]);
 
   // --- SWIPE ---
 
@@ -239,6 +253,20 @@ export function useGameState(): UseGameStateReturn {
           if (newRescued >= prev.rescueTarget) {
             stopMusic();
             Sounds.gameStart(); // victory sound
+            // Record stars and unlock next level
+            const swapsUsed = currentLevel.swaps - prev.swapsLeft;
+            const powerUpsUsed = prev.powerUps.filter((p) => p.used).length;
+            const stars = prev.timeLeft / currentLevel.time > 0.25
+              ? (swapsUsed === 0 && powerUpsUsed <= 1 ? 3 : 2)
+              : 1;
+            setLevelStars((prev) => {
+              const next = [...prev];
+              next[currentLevel.id - 1] = Math.max(next[currentLevel.id - 1], stars);
+              return next;
+            });
+            if (currentLevel.id < LEVELS.length) {
+              setMaxUnlockedLevel((prev) => Math.max(prev, currentLevel.id + 1));
+            }
             return {
               ...prev,
               planets: filled,
@@ -542,6 +570,10 @@ export function useGameState(): UseGameStateReturn {
     removingPlanetIds,
     newPlanetIds,
     antigravityActive,
+    currentLevel,
+    levelStars,
+    maxUnlockedLevel,
+    startLevel,
     startGame,
     selectPlanet,
     onSwipeStart,

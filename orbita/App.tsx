@@ -24,15 +24,17 @@ import { GameBoard } from './src/components/GameBoard';
 import { PowerUpPanel } from './src/components/PowerUpPanel';
 import { SupernovaExplosion } from './src/components/SupernovaExplosion';
 import { useGameState } from './src/hooks/useGameState';
+import { LEVELS } from './src/types/levels';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 function GameScreen() {
   const insets = useSafeAreaInsets();
   const game = useGameState();
-  const { state, startGame, usePowerUp } = game;
+  const { state, startGame, startLevel, usePowerUp, currentLevel, levelStars, maxUnlockedLevel } = game;
 
   const [showTitle, setShowTitle] = useState(true);
+  const [showLevelSelect, setShowLevelSelect] = useState(false);
 
   // Very slow background rotation
   const bgRotation = useSharedValue(0);
@@ -56,9 +58,14 @@ function GameScreen() {
   const handleTitleTap = useCallback(() => {
     if (showTitle) {
       setShowTitle(false);
-      startGame();
+      setShowLevelSelect(true);
     }
-  }, [showTitle, startGame]);
+  }, [showTitle]);
+
+  const handleSelectLevel = useCallback((levelId: number) => {
+    setShowLevelSelect(false);
+    startLevel(levelId);
+  }, [startLevel]);
 
   const progressWidth = (state.timeLeft / state.totalTime) * 100;
   const timeRatio = state.timeLeft / state.totalTime;
@@ -98,8 +105,42 @@ function GameScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Level Select Screen */}
+      {showLevelSelect && (
+        <Animated.View entering={FadeIn.duration(400)} style={styles.levelSelectContainer}>
+          <Text style={styles.levelSelectTitle}>SELECT SYSTEM</Text>
+          <View style={styles.levelGrid}>
+            {LEVELS.map((level) => {
+              const unlocked = level.id <= maxUnlockedLevel;
+              const stars = levelStars[level.id - 1] || 0;
+              return (
+                <TouchableOpacity
+                  key={level.id}
+                  style={[styles.levelButton, !unlocked && styles.levelLocked]}
+                  onPress={() => unlocked && handleSelectLevel(level.id)}
+                  disabled={!unlocked}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.levelNumber, !unlocked && { color: 'rgba(255,255,255,0.2)' }]}>
+                    {level.id}
+                  </Text>
+                  <Text style={styles.levelName} numberOfLines={1}>
+                    {unlocked ? level.name : '???'}
+                  </Text>
+                  {stars > 0 && (
+                    <Text style={styles.levelStars}>
+                      {'★'.repeat(stars)}{'☆'.repeat(3 - stars)}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+      )}
+
       {/* Game UI */}
-      {(state.phase === 'playing' || state.phase === 'won' || state.phase === 'exploding') && !showTitle && (
+      {(state.phase === 'playing' || state.phase === 'won' || state.phase === 'exploding') && !showTitle && !showLevelSelect && (
         <Animated.View entering={FadeIn.delay(200).duration(500)} style={styles.gameContainer}>
           {/* Top: Rescued + Timer + Swaps */}
           <View style={styles.topBar}>
@@ -185,13 +226,24 @@ function GameScreen() {
             <Text style={styles.wonTitle}>SYSTEM SAVED!</Text>
             <Text style={styles.finalScore}>{state.rescued}</Text>
             <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
-            <Text style={styles.newBest}>Star stabilized!</Text>
+            <Text style={styles.levelNameResult}>Level {currentLevel.id}: {currentLevel.name}</Text>
+            {currentLevel.id < LEVELS.length ? (
+              <TouchableOpacity
+                style={styles.playAgainButton}
+                onPress={() => handleSelectLevel(currentLevel.id + 1)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.playAgainText}>NEXT SYSTEM</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.newBest}>All systems saved!</Text>
+            )}
             <TouchableOpacity
-              style={styles.playAgainButton}
-              onPress={() => { setShowTitle(false); startGame(); }}
+              style={[styles.playAgainButton, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.3)' }]}
+              onPress={() => setShowLevelSelect(true)}
               activeOpacity={0.8}
             >
-              <Text style={styles.playAgainText}>NEXT SYSTEM</Text>
+              <Text style={[styles.playAgainText, { color: 'rgba(255,255,255,0.6)' }]}>LEVEL SELECT</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -210,15 +262,20 @@ function GameScreen() {
             {state.rescued > 0 && (
               <Text style={styles.bestScore}>So close! {state.rescueTarget - state.rescued} more needed</Text>
             )}
+            <Text style={styles.levelNameResult}>Level {currentLevel.id}: {currentLevel.name}</Text>
             <TouchableOpacity
               style={styles.playAgainButton}
-              onPress={() => {
-                setShowTitle(false);
-                startGame();
-              }}
+              onPress={() => startLevel(currentLevel.id)}
               activeOpacity={0.8}
             >
-              <Text style={styles.playAgainText}>PLAY AGAIN</Text>
+              <Text style={styles.playAgainText}>TRY AGAIN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.playAgainButton, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.3)' }]}
+              onPress={() => setShowLevelSelect(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.playAgainText, { color: 'rgba(255,255,255,0.6)' }]}>LEVEL SELECT</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -447,5 +504,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 3,
+  },
+  levelSelectContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 90,
+    backgroundColor: 'rgba(6, 8, 24, 0.95)',
+    paddingHorizontal: 20,
+  },
+  levelSelectTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#ffd700',
+    letterSpacing: 6,
+    marginBottom: 24,
+  },
+  levelGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  levelButton: {
+    width: 90,
+    height: 90,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  levelLocked: {
+    opacity: 0.3,
+  },
+  levelNumber: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#f5e6c8',
+  },
+  levelName: {
+    fontSize: 8,
+    color: 'rgba(245,230,200,0.5)',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  levelStars: {
+    fontSize: 12,
+    color: '#ffd700',
+    marginTop: 2,
+  },
+  levelNameResult: {
+    fontSize: 14,
+    color: 'rgba(245,230,200,0.5)',
+    letterSpacing: 2,
+    marginTop: 8,
+    marginBottom: 16,
   },
 });

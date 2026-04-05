@@ -52,12 +52,19 @@ export function angleDiff(a: number, b: number): number {
   return Math.min(diff, 360 - diff);
 }
 
-export function randomPlanetType(): PlanetType {
-  return PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
+let allowedTypes: PlanetType[] = PLANET_TYPES;
+
+export function setAllowedTypes(types: PlanetType[]): void {
+  allowedTypes = types;
 }
 
-export function generateBoard(): Planet[] {
+export function randomPlanetType(): PlanetType {
+  return allowedTypes[Math.floor(Math.random() * allowedTypes.length)];
+}
+
+export function generateBoard(types?: PlanetType[]): Planet[] {
   resetIdCounter();
+  if (types) setAllowedTypes(types);
   const planets: Planet[] = [];
   for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
     const config = ORBIT_CONFIGS[oi];
