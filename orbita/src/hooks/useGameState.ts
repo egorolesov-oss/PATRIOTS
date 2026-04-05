@@ -374,13 +374,114 @@ export function useGameState(): UseGameStateReturn {
         break;
       }
       case PowerUpType.NOVA_PULSE: {
+        // MAGNET: find nearest potential triple and align them
         Sounds.powerUp();
-        setState((prev) => ({
-          ...prev,
-          powerUps: prev.powerUps.map((p) =>
-            p.type === type ? { ...p, used: true } : p
-          ),
-        }));
+        setState((prev) => {
+          const angles = rotationAnglesRef.current;
+          const byType: Record<string, typeof prev.planets> = {};
+          for (const p of prev.planets) {
+            if (!byType[p.type]) byType[p.type] = [];
+            byType[p.type].push(p);
+          }
+
+          // Find the type with planets on all 3 orbits that are closest to aligned
+          let bestTriple: typeof prev.planets | null = null;
+          let bestDiff = Infinity;
+
+          for (const type of Object.keys(byType)) {
+            const group = byType[type];
+            const byOrbit: (typeof prev.planets)[] = [[], [], []];
+            for (const p of group) byOrbit[p.orbitIndex].push(p);
+            if (!byOrbit[0].length || !byOrbit[1].length || !byOrbit[2].length) continue;
+
+            // Check all triples
+            for (const p0 of byOrbit[0]) {
+              const a0 = (p0.slotIndex * 360 / 6 + angles[0]) % 360;
+              for (const p1 of byOrbit[1]) {
+                const a1 = (p1.slotIndex * 360 / 8 + angles[1]) % 360;
+                for (const p2 of byOrbit[2]) {
+                  const a2 = (p2.slotIndex * 360 / 10 + angles[2]) % 360;
+                  const d01 = Math.min(Math.abs(a0 - a1), 360 - Math.abs(a0 - a1));
+                  const d02 = Math.min(Math.abs(a0 - a2), 360 - Math.abs(a0 - a2));
+                  const d12 = Math.min(Math.abs(a1 - a2), 360 - Math.abs(a1 - a2));
+                  const totalDiff = d01 + d02 + d12;
+                  if (totalDiff < bestDiff) {
+                    bestDiff = totalDiff;
+                    bestTriple = [p0, p1, p2];
+                  }
+                }
+              }
+            }
+          }
+
+          if (!bestTriple) {
+            return {
+              ...prev,
+              powerUps: prev.powerUps.map((p) =>
+                p.type === type ? { ...p, used: true } : p
+              ),
+            };
+          }
+
+          // Move middle and outer planet slots to align with inner planet's angle
+          const targetAngle = (bestTriple[0].slotIndex * 360 / 6 + angles[0]) % 360;
+
+          // Find closest slot on middle orbit to targetAngle
+          let bestSlot1 = 0;
+          let bestSlotDiff1 = Infinity;
+          for (let s = 0; s < 8; s++) {
+            const sa = (s * 360 / 8 + angles[1]) % 360;
+            const d = Math.min(Math.abs(sa - targetAngle), 360 - Math.abs(sa - targetAngle));
+            if (d < bestSlotDiff1) { bestSlotDiff1 = d; bestSlot1 = s; }
+          }
+
+          // Find closest slot on outer orbit
+          let bestSlot2 = 0;
+          let bestSlotDiff2 = Infinity;
+          for (let s = 0; s < 10; s++) {
+            const sa = (s * 360 / 10 + angles[2]) % 360;
+            const d = Math.min(Math.abs(sa - targetAngle), 360 - Math.abs(sa - targetAngle));
+            if (d < bestSlotDiff2) { bestSlotDiff2 = d; bestSlot2 = s; }
+          }
+
+          // Swap planets to aligned slots
+          const newPlanets = prev.planets.map((p) => {
+            // Move middle orbit planet to aligned slot
+            if (p.id === bestTriple![1].id) {
+              const occupant = prev.planets.find(
+                (o) => o.orbitIndex === 1 && o.slotIndex === bestSlot1 && o.id !== p.id
+              );
+              if (occupant) {
+                // Will be handled below
+              }
+              return { ...p, slotIndex: bestSlot1 };
+            }
+            // Move outer orbit planet to aligned slot
+            if (p.id === bestTriple![2].id) {
+              return { ...p, slotIndex: bestSlot2 };
+            }
+            return p;
+          });
+
+          // Swap occupants to old slots
+          const finalPlanets = newPlanets.map((p) => {
+            if (p.orbitIndex === 1 && p.slotIndex === bestSlot1 && p.id !== bestTriple![1].id) {
+              return { ...p, slotIndex: bestTriple![1].slotIndex };
+            }
+            if (p.orbitIndex === 2 && p.slotIndex === bestSlot2 && p.id !== bestTriple![2].id) {
+              return { ...p, slotIndex: bestTriple![2].slotIndex };
+            }
+            return p;
+          });
+
+          return {
+            ...prev,
+            planets: finalPlanets,
+            powerUps: prev.powerUps.map((p) =>
+              p.type === type ? { ...p, used: true } : p
+            ),
+          };
+        });
         break;
       }
       case PowerUpType.ANTIGRAVITY: {

@@ -47,16 +47,22 @@ const PowerUpIcon: React.FC<{ type: PowerUpType; size: number }> = ({ type, size
       );
     }
     case PowerUpType.NOVA_PULSE: {
-      // Starburst / pulse
-      const pts = [];
-      for (let i = 0; i < 12; i++) {
-        const r = i % 2 === 0 ? half * 0.9 : half * 0.4;
-        const angle = (i * 30 - 90) * (Math.PI / 180);
-        pts.push(`${half + r * Math.cos(angle)},${half + r * Math.sin(angle)}`);
-      }
+      // Magnet U-shape
       return (
         <Svg width={size} height={size}>
-          <Polygon points={pts.join(' ')} fill="#f1c40f" />
+          <Path
+            d={`M ${half - 7} ${size * 0.2}
+                L ${half - 7} ${size * 0.55}
+                Q ${half - 7} ${size * 0.8} ${half} ${size * 0.8}
+                Q ${half + 7} ${size * 0.8} ${half + 7} ${size * 0.55}
+                L ${half + 7} ${size * 0.2}`}
+            stroke="#f1c40f"
+            strokeWidth={3}
+            fill="none"
+            strokeLinecap="round"
+          />
+          <Line x1={half - 9} y1={size * 0.2} x2={half - 5} y2={size * 0.2} stroke="#e74c3c" strokeWidth={3} />
+          <Line x1={half + 5} y1={size * 0.2} x2={half + 9} y2={size * 0.2} stroke="#3498db" strokeWidth={3} />
         </Svg>
       );
     }
@@ -110,7 +116,7 @@ const PowerUpButton: React.FC<{
 
   const label = {
     [PowerUpType.STAR_FREEZE]: 'FREEZE',
-    [PowerUpType.NOVA_PULSE]: 'PULSE',
+    [PowerUpType.NOVA_PULSE]: 'MAGNET',
     [PowerUpType.ANTIGRAVITY]: 'ANTI-G',
   }[powerUp.type];
 
