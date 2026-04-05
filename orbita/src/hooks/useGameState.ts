@@ -97,12 +97,20 @@ export function useGameState(): UseGameStateReturn {
   }, []);
 
   // Timer tick — called from GameBoard animation loop
+  const musicTickRef = useRef(0);
   const tickTimer = useCallback((dt: number) => {
     if (stateRef.current.phase !== 'playing' || isPaused) return;
+
+    // Update music urgency every ~1 second (not every frame)
+    musicTickRef.current += dt;
+    if (musicTickRef.current > 1) {
+      musicTickRef.current = 0;
+      const ratio = stateRef.current.timeLeft / stateRef.current.totalTime;
+      setMusicUrgency(ratio);
+    }
+
     setState((prev) => {
       const newTime = Math.max(0, prev.timeLeft - dt);
-      // Update music urgency
-      setMusicUrgency(newTime / prev.totalTime);
       if (newTime <= 0) {
         // Star explodes — game over
         stopMusic();
