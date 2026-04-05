@@ -3,14 +3,15 @@ import { PlanetType, PowerUpType } from './game';
 export interface LevelConfig {
   id: number;
   name: string;
-  time: number;           // seconds
+  time: number;
   rescueTarget: number;
   swaps: number;
   planetTypes: PlanetType[];
+  slots: [number, number, number]; // [inner, middle, outer]
   speedMultiplier: number;
-  alignmentTolerance: number; // degrees
+  alignmentTolerance: number;
   powerUps: { type: PowerUpType; uses: number }[];
-  newMechanic?: string;   // tutorial hint text
+  newMechanic?: string;
 }
 
 export const LEVELS: LevelConfig[] = [
@@ -21,6 +22,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 6,
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
+    slots: [3, 4, 5],   // 12 planets
     speedMultiplier: 0.5,
     alignmentTolerance: 25,
     powerUps: [],
@@ -33,6 +35,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 9,
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
+    slots: [4, 5, 6],   // 15 planets
     speedMultiplier: 0.7,
     alignmentTolerance: 22,
     powerUps: [{ type: PowerUpType.STAR_FREEZE, uses: 1 }],
@@ -45,6 +48,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 12,
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD],
+    slots: [4, 6, 7],   // 17 planets
     speedMultiplier: 0.8,
     alignmentTolerance: 20,
     powerUps: [
@@ -60,6 +64,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 15,
     swaps: 5,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD],
+    slots: [5, 6, 8],   // 19 planets
     speedMultiplier: 1.0,
     alignmentTolerance: 18,
     powerUps: [
@@ -75,6 +80,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 15,
     swaps: 4,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK],
+    slots: [5, 7, 8],   // 20 planets
     speedMultiplier: 1.2,
     alignmentTolerance: 16,
     powerUps: [
@@ -90,6 +96,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 18,
     swaps: 4,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK],
+    slots: [5, 7, 9],   // 21 planets
     speedMultiplier: 1.3,
     alignmentTolerance: 14,
     powerUps: [
@@ -104,6 +111,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 18,
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
+    slots: [6, 7, 9],   // 22 planets
     speedMultiplier: 1.4,
     alignmentTolerance: 12,
     powerUps: [
@@ -118,6 +126,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 21,
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
+    slots: [6, 8, 9],   // 23 planets
     speedMultiplier: 1.5,
     alignmentTolerance: 11,
     powerUps: [
@@ -132,6 +141,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 21,
     swaps: 2,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
+    slots: [6, 8, 10],  // 24 planets
     speedMultiplier: 1.6,
     alignmentTolerance: 10,
     powerUps: [
@@ -145,6 +155,7 @@ export const LEVELS: LevelConfig[] = [
     rescueTarget: 24,
     swaps: 2,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
+    slots: [6, 8, 10],  // 24 planets
     speedMultiplier: 1.8,
     alignmentTolerance: 9,
     powerUps: [
@@ -157,12 +168,8 @@ export const LEVELS: LevelConfig[] = [
 
 export function getStarRating(level: LevelConfig, rescued: number, timeLeft: number, swapsUsed: number, powerUpsUsed: number): number {
   if (rescued < level.rescueTarget) return 0;
-  // 3★: completed with minimal resources
-  const totalPowerUps = level.powerUps.reduce((s, p) => s + p.uses, 0);
-  if (swapsUsed === 0 && powerUpsUsed <= 1) return 3;
-  // 2★: completed with good time remaining
   const timeRatio = timeLeft / level.time;
+  if (swapsUsed === 0 && powerUpsUsed <= 1) return 3;
   if (timeRatio > 0.25) return 2;
-  // 1★: just completed
   return 1;
 }

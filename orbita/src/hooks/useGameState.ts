@@ -146,7 +146,7 @@ export function useGameState(): UseGameStateReturn {
   const startLevel = useCallback((levelId: number) => {
     const level = LEVELS.find((l) => l.id === levelId) || LEVELS[0];
     setCurrentLevel(level);
-    const planets = generateBoard(level.planetTypes);
+    const planets = generateBoard(level.planetTypes, level.slots);
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
     freezeActiveRef.current = false;
     Sounds.gameStart();

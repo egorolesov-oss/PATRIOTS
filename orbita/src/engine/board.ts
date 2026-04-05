@@ -19,8 +19,7 @@ export function generateId(): string {
 }
 
 export function getSlotAngle(orbitIndex: number, slotIndex: number): number {
-  const config = ORBIT_CONFIGS[orbitIndex];
-  return (slotIndex * 360) / config.slotCount;
+  return (slotIndex * 360) / currentSlots[orbitIndex];
 }
 
 export function getSlotPosition(
@@ -31,7 +30,7 @@ export function getSlotPosition(
   rotationAngle: number = 0
 ): { x: number; y: number; angle: number } {
   const config = ORBIT_CONFIGS[orbitIndex];
-  const baseAngle = (slotIndex * 360) / config.slotCount;
+  const baseAngle = (slotIndex * 360) / currentSlots[orbitIndex];
   const angle = baseAngle + rotationAngle;
   const rad = (angle * Math.PI) / 180;
   return {
@@ -53,6 +52,15 @@ export function angleDiff(a: number, b: number): number {
 }
 
 let allowedTypes: PlanetType[] = PLANET_TYPES;
+let currentSlots: [number, number, number] = [6, 8, 10];
+
+export function setCurrentSlots(slots: [number, number, number]): void {
+  currentSlots = slots;
+}
+
+export function getSlotCount(orbitIndex: number): number {
+  return currentSlots[orbitIndex];
+}
 
 export function setAllowedTypes(types: PlanetType[]): void {
   allowedTypes = types;
@@ -62,13 +70,14 @@ export function randomPlanetType(): PlanetType {
   return allowedTypes[Math.floor(Math.random() * allowedTypes.length)];
 }
 
-export function generateBoard(types?: PlanetType[]): Planet[] {
+export function generateBoard(types?: PlanetType[], slots?: [number, number, number]): Planet[] {
   resetIdCounter();
   if (types) setAllowedTypes(types);
+  if (slots) setCurrentSlots(slots);
   const planets: Planet[] = [];
   for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
-    const config = ORBIT_CONFIGS[oi];
-    for (let si = 0; si < config.slotCount; si++) {
+    const slotCount = currentSlots[oi];
+    for (let si = 0; si < slotCount; si++) {
       planets.push({
         id: generateId(),
         type: randomPlanetType(),
@@ -234,7 +243,7 @@ export function fillEmptySlots(planets: Planet[]): Planet[] {
 
   for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
     const config = ORBIT_CONFIGS[oi];
-    for (let si = 0; si < config.slotCount; si++) {
+    for (let si = 0; si < currentSlots[oi]; si++) {
       const key = `${oi}-${si}`;
       if (!occupied.has(key)) {
         newPlanets.push({
@@ -283,7 +292,7 @@ export function biasedFillEmptySlots(planets: Planet[]): Planet[] {
 
   for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
     const config = ORBIT_CONFIGS[oi];
-    for (let si = 0; si < config.slotCount; si++) {
+    for (let si = 0; si < currentSlots[oi]; si++) {
       const key = `${oi}-${si}`;
       if (!occupied.has(key)) {
         let type: PlanetType;
