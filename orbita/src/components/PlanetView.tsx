@@ -33,6 +33,7 @@ interface Props {
   isNew: boolean;
   isMatchable: boolean;
   isCollected: boolean;
+  isFloating: boolean;
   onTap: (planet: Planet) => void;
 }
 
@@ -46,6 +47,7 @@ export const PlanetView: React.FC<Props> = ({
   isNew,
   isMatchable,
   isCollected,
+  isFloating,
   onTap,
 }) => {
   const config = PLANET_CONFIGS[planet.type];
@@ -126,6 +128,39 @@ export const PlanetView: React.FC<Props> = ({
       translateY.value = targetY;
     }
   }, [pos.x, pos.y, planet.orbitIndex, planet.slotIndex]);
+
+  // Antigravity floating — planets drift outward randomly
+  useEffect(() => {
+    if (isFloating) {
+      const idNum = parseInt(planet.id.replace('p', ''), 10) || 1;
+      // Random drift direction unique to each planet
+      const driftAngle = ((idNum * 137.5) % 360) * (Math.PI / 180);
+      const driftDist = 25 + (idNum % 5) * 8;
+      const driftX = Math.cos(driftAngle) * driftDist;
+      const driftY = Math.sin(driftAngle) * driftDist;
+
+      translateX.value = withTiming(translateX.value + driftX, {
+        duration: 800, easing: Easing.out(Easing.ease),
+      });
+      translateY.value = withTiming(translateY.value + driftY, {
+        duration: 800, easing: Easing.out(Easing.ease),
+      });
+      scaleVal.value = withTiming(0.7, { duration: 600 });
+      opacityVal.value = withTiming(0.5, { duration: 600 });
+    } else {
+      // Reassemble — snap back to current orbit position
+      const targetX = pos.x - pSize / 2;
+      const targetY = pos.y - pSize / 2;
+      translateX.value = withTiming(targetX, {
+        duration: 600, easing: Easing.inOut(Easing.ease),
+      });
+      translateY.value = withTiming(targetY, {
+        duration: 600, easing: Easing.inOut(Easing.ease),
+      });
+      scaleVal.value = withSpring(1, { damping: 8 });
+      opacityVal.value = withTiming(1, { duration: 400 });
+    }
+  }, [isFloating]);
 
   // Selected
   useEffect(() => {

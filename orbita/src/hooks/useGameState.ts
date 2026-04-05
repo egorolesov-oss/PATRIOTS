@@ -39,6 +39,7 @@ export interface UseGameStateReturn {
   proximityPairs: ProximityPair[];
   removingPlanetIds: Set<string>;
   newPlanetIds: Set<string>;
+  antigravityActive: boolean;
   startGame: () => void;
   selectPlanet: (planet: Planet) => void;
   onSwipeStart: (planet: Planet) => void;
@@ -79,6 +80,7 @@ export function useGameState(): UseGameStateReturn {
   const [proximityPairs, setProximityPairs] = useState<ProximityPair[]>([]);
   const [removingPlanetIds, setRemovingPlanetIds] = useState<Set<string>>(new Set());
   const [newPlanetIds, setNewPlanetIds] = useState<Set<string>>(new Set());
+  const [antigravityActive, setAntigravityActive] = useState(false);
   const processingRef = useRef(false);
   const freezeActiveRef = useRef(false);
   const freezeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -383,21 +385,36 @@ export function useGameState(): UseGameStateReturn {
       }
       case PowerUpType.ANTIGRAVITY: {
         Sounds.shake();
-        setState((prev) => {
-          const types = prev.planets.map((p) => p.type);
-          for (let i = types.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [types[i], types[j]] = [types[j], types[i]];
-          }
-          const shuffled = prev.planets.map((p, i) => ({ ...p, type: types[i] }));
-          return {
-            ...prev,
-            planets: shuffled,
-            powerUps: prev.powerUps.map((p) =>
-              p.type === type ? { ...p, used: true } : p
-            ),
-          };
-        });
+        processingRef.current = true;
+        // Phase 1: planets float outward (antigravity on)
+        setAntigravityActive(true);
+        setState((prev) => ({
+          ...prev,
+          powerUps: prev.powerUps.map((p) =>
+            p.type === type ? { ...p, used: true } : p
+          ),
+        }));
+
+        // Phase 2: after 1.5s, shuffle types and reassemble
+        setTimeout(() => {
+          setState((prev) => {
+            const types = prev.planets.map((p) => p.type);
+            for (let i = types.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [types[i], types[j]] = [types[j], types[i]];
+            }
+            return {
+              ...prev,
+              planets: prev.planets.map((p, i) => ({ ...p, type: types[i] })),
+            };
+          });
+          setAntigravityActive(false);
+          Sounds.powerUp();
+
+          setTimeout(() => {
+            processingRef.current = false;
+          }, 600);
+        }, 1500);
         break;
       }
     }
@@ -414,6 +431,7 @@ export function useGameState(): UseGameStateReturn {
     proximityPairs,
     removingPlanetIds,
     newPlanetIds,
+    antigravityActive,
     startGame,
     selectPlanet,
     onSwipeStart,

@@ -33,6 +33,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     proximityPairs,
     removingPlanetIds,
     newPlanetIds,
+    antigravityActive,
     selectPlanet,
     onSwipeStart,
     onSwipeThrough,
@@ -238,6 +239,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
             isNew={newPlanetIds.has(planet.id)}
             isMatchable={alignedIds.has(planet.id)}
             isCollected={collectedSet.has(planet.id)}
+            isFloating={antigravityActive}
             onTap={selectPlanet}
           />
         ))}

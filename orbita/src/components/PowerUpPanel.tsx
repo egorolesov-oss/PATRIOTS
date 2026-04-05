@@ -111,7 +111,7 @@ const PowerUpButton: React.FC<{
   const label = {
     [PowerUpType.STAR_FREEZE]: 'FREEZE',
     [PowerUpType.NOVA_PULSE]: 'PULSE',
-    [PowerUpType.ANTIGRAVITY]: 'SHAKE',
+    [PowerUpType.ANTIGRAVITY]: 'ANTI-G',
   }[powerUp.type];
 
   return (
