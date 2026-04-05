@@ -2,7 +2,7 @@ import {
   Planet,
   PlanetType,
   ORBIT_CONFIGS,
-  OrbitMatch,
+  PLANET_HITBOX,
 } from '../types/game';
 
 const PLANET_TYPES = Object.values(PlanetType);
@@ -45,6 +45,11 @@ export function normalizeAngle(angle: number): number {
   return a;
 }
 
+export function angleDiff(a: number, b: number): number {
+  const diff = Math.abs(normalizeAngle(a) - normalizeAngle(b));
+  return Math.min(diff, 360 - diff);
+}
+
 export function randomPlanetType(): PlanetType {
   return PLANET_TYPES[Math.floor(Math.random() * PLANET_TYPES.length)];
 }
@@ -66,115 +71,75 @@ export function generateBoard(): Planet[] {
   return planets;
 }
 
-/**
- * Find all groups of 3+ adjacent same-type planets on each orbit.
- * Orbits are circular, so slot 0 is adjacent to the last slot.
- */
-export function findOrbitMatches(planets: Planet[]): OrbitMatch[] {
-  const matches: OrbitMatch[] = [];
-
-  for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
-    const config = ORBIT_CONFIGS[oi];
-    const slotCount = config.slotCount;
-    // Build slot array for this orbit
-    const slots: (Planet | null)[] = new Array(slotCount).fill(null);
-    for (const p of planets) {
-      if (p.orbitIndex === oi) {
-        slots[p.slotIndex] = p;
-      }
-    }
-
-    // Find runs of same type (circular)
-    const visited = new Set<number>();
-    for (let start = 0; start < slotCount; start++) {
-      if (visited.has(start) || !slots[start]) continue;
-      const type = slots[start]!.type;
-      const group: Planet[] = [slots[start]!];
-      visited.add(start);
-
-      // Expand forward
-      let next = (start + 1) % slotCount;
-      while (next !== start && slots[next] && slots[next]!.type === type) {
-        group.push(slots[next]!);
-        visited.add(next);
-        next = (next + 1) % slotCount;
-      }
-
-      if (group.length >= 3) {
-        matches.push({ orbitIndex: oi, planets: group, type });
-      }
-    }
-  }
-
-  return matches;
+export function getPlanetAngle(planet: Planet, rotationAngles: number[]): number {
+  return normalizeAngle(
+    getSlotAngle(planet.orbitIndex, planet.slotIndex) +
+      rotationAngles[planet.orbitIndex]
+  );
 }
 
 /**
- * Check if a planet belongs to any match group (for highlighting).
+ * Check if a swipe collection is valid:
+ * - All same type
+ * - All on DIFFERENT orbits
+ * - At least 2 planets (2 orbits), ideally 3 (all orbits)
  */
-export function findMatchingPlanetIds(planets: Planet[]): Set<string> {
-  const matches = findOrbitMatches(planets);
+export function isValidSwipe(collected: Planet[]): boolean {
+  if (collected.length < 2) return false;
+  const type = collected[0].type;
+  if (!collected.every((p) => p.type === type)) return false;
+  const orbits = new Set(collected.map((p) => p.orbitIndex));
+  return orbits.size === collected.length; // each on a different orbit
+}
+
+/**
+ * Find groups of same-type planets that are nearly aligned across orbits.
+ * Returns planet IDs that are part of any potential alignment (within tolerance).
+ */
+export function findAlignedGroups(
+  planets: Planet[],
+  rotationAngles: number[],
+  tolerance: number = 15
+): Set<string> {
   const ids = new Set<string>();
-  for (const m of matches) {
-    for (const p of m.planets) {
-      ids.add(p.id);
+  const byType: Record<string, Planet[]> = {};
+
+  for (const p of planets) {
+    if (!byType[p.type]) byType[p.type] = [];
+    byType[p.type].push(p);
+  }
+
+  for (const type of Object.keys(byType)) {
+    const group = byType[type];
+    // Check all pairs across different orbits
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        if (group[i].orbitIndex === group[j].orbitIndex) continue;
+        const a1 = getPlanetAngle(group[i], rotationAngles);
+        const a2 = getPlanetAngle(group[j], rotationAngles);
+        if (angleDiff(a1, a2) < tolerance) {
+          ids.add(group[i].id);
+          ids.add(group[j].id);
+          // Check for third planet on remaining orbit
+          for (let k = 0; k < group.length; k++) {
+            if (k === i || k === j) continue;
+            if (group[k].orbitIndex === group[i].orbitIndex ||
+                group[k].orbitIndex === group[j].orbitIndex) continue;
+            const a3 = getPlanetAngle(group[k], rotationAngles);
+            if (angleDiff(a3, a1) < tolerance && angleDiff(a3, a2) < tolerance) {
+              ids.add(group[k].id);
+            }
+          }
+        }
+      }
     }
   }
+
   return ids;
 }
 
-/**
- * Check if a set of planet IDs forms a valid swipe
- * (all same type, all adjacent on the same orbit, 3+ planets).
- */
-export function isValidSwipe(
-  planets: Planet[],
-  collectedIds: string[]
-): boolean {
-  if (collectedIds.length < 3) return false;
-
-  const collected = planets.filter((p) => collectedIds.includes(p.id));
-  if (collected.length < 3) return false;
-
-  // All same type
-  const type = collected[0].type;
-  if (!collected.every((p) => p.type === type)) return false;
-
-  // All same orbit
-  const orbit = collected[0].orbitIndex;
-  if (!collected.every((p) => p.orbitIndex === orbit)) return false;
-
-  // All adjacent
-  const slotCount = ORBIT_CONFIGS[orbit].slotCount;
-  const slotSet = new Set(collected.map((p) => p.slotIndex));
-  const sortedSlots = [...slotSet].sort((a, b) => a - b);
-
-  // Check if consecutive (accounting for circular wrap)
-  let consecutive = true;
-  for (let i = 1; i < sortedSlots.length; i++) {
-    if (sortedSlots[i] - sortedSlots[i - 1] !== 1) {
-      consecutive = false;
-      break;
-    }
-  }
-  // Check wrap-around case (e.g., slots 0,1,9 on 10-slot orbit)
-  if (!consecutive && sortedSlots.length >= 3) {
-    const wrapCheck = sortedSlots[sortedSlots.length - 1] - sortedSlots[0] === slotCount - 1;
-    if (wrapCheck) {
-      // Check if the gap is exactly at one point
-      let gapCount = 0;
-      for (let i = 1; i < sortedSlots.length; i++) {
-        if (sortedSlots[i] - sortedSlots[i - 1] !== 1) gapCount++;
-      }
-      consecutive = gapCount === 1;
-    }
-  }
-
-  return consecutive;
-}
-
 export function calculateScore(matchCount: number, combo: number): number {
-  const base = matchCount === 3 ? 300 : matchCount === 4 ? 600 : 1000;
+  const base = matchCount === 2 ? 200 : matchCount === 3 ? 500 : 800;
   let multiplier = 1;
   if (combo >= 4) multiplier = 3;
   else if (combo >= 3) multiplier = 2.5;

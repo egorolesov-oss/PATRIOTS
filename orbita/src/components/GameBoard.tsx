@@ -26,7 +26,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     isSwiping,
     isPaused,
     swipe,
-    matchableIds,
+    alignedIds,
     removingPlanetIds,
     newPlanetIds,
     swapPair,
@@ -36,7 +36,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     onSwipeEnd,
     onSwapComplete,
     setRotationAngles,
-    updateMatchables,
+    updateAligned,
   } = game;
 
   const centerX = boardSize / 2;
@@ -70,7 +70,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       matchTickRef.current += dt;
       if (matchTickRef.current > 0.3) {
         matchTickRef.current = 0;
-        updateMatchables();
+        updateAligned();
       }
 
       animFrameRef.current = requestAnimationFrame(animate);
@@ -188,7 +188,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
             isSelected={state.selectedPlanetId === planet.id}
             isRemoving={removingPlanetIds.has(planet.id)}
             isNew={newPlanetIds.has(planet.id)}
-            isMatchable={matchableIds.has(planet.id)}
+            isMatchable={alignedIds.has(planet.id)}
             isCollected={collectedSet.has(planet.id)}
             onTap={selectPlanet}
             swapTarget={getSwapTarget(planet)}
