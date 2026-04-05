@@ -119,25 +119,26 @@ export function useGameState(): UseGameStateReturn {
       setMusicUrgency(ratio);
     }
 
-    setState((prev) => {
-      const newTime = Math.max(0, prev.timeLeft - dt);
-      if (newTime <= 0 && prev.phase === 'playing') {
-        // Check if player actually won at the last moment
-        if (prev.rescued >= prev.rescueTarget) {
-          stopMusic();
-          Sounds.gameStart(); // victory!
-          return {
-            ...prev,
-            timeLeft: 0,
-            phase: 'won',
-            bestRescued: Math.max(prev.bestRescued, prev.rescued),
-          };
-        }
-        // Star explodes — start explosion animation
+    const cur = stateRef.current;
+    if (cur.timeLeft <= 0 || cur.phase !== 'playing') return;
+
+    const newTime = Math.max(0, cur.timeLeft - dt);
+    if (newTime <= 0) {
+      if (cur.rescued >= cur.rescueTarget) {
+        // Won at last moment
         stopMusic();
-        // Delay sound slightly so audio context isn't busy
-        setTimeout(() => Sounds.gameOver(), 100);
-        // Transition to gameover after 4 seconds
+        Sounds.gameStart();
+        setState((prev) => ({
+          ...prev,
+          timeLeft: 0,
+          phase: 'won',
+          bestRescued: Math.max(prev.bestRescued, prev.rescued),
+        }));
+      } else {
+        // Star explodes
+        stopMusic();
+        Sounds.gameOver();
+        setState((prev) => ({ ...prev, timeLeft: 0, phase: 'exploding' }));
         setTimeout(() => {
           setState((p) => ({
             ...p,
@@ -145,14 +146,10 @@ export function useGameState(): UseGameStateReturn {
             bestRescued: Math.max(p.bestRescued, p.rescued),
           }));
         }, 4000);
-        return {
-          ...prev,
-          timeLeft: 0,
-          phase: 'exploding',
-        };
       }
-      return { ...prev, timeLeft: newTime };
-    });
+    } else {
+      setState((prev) => ({ ...prev, timeLeft: newTime }));
+    }
   }, [isPaused]);
 
   const startLevel = useCallback((levelId: number) => {
