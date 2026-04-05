@@ -15,7 +15,21 @@ import Animated, {
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-type TutorialStep = 'look' | 'swipe_demo' | 'your_turn' | 'done';
+type TutStep =
+  | 'welcome'
+  | 'swipe_explain'
+  | 'swipe_demo'
+  | 'swipe_try'
+  | 'swap_explain'
+  | 'swap_try'
+  | 'freeze_explain'
+  | 'freeze_try'
+  | 'magnet_explain'
+  | 'magnet_try'
+  | 'antigrav_explain'
+  | 'antigrav_try'
+  | 'go'
+  | 'done';
 
 interface PlanetPos {
   x: number;
@@ -26,95 +40,250 @@ interface PlanetPos {
 interface Props {
   onComplete: () => void;
   setPaused: (paused: boolean) => void;
-  firstMatchDone: boolean;
-  alignedPlanets: PlanetPos[]; // positions of first aligned triple
-  boardOffsetY: number; // board's Y offset from screen top
+  rescued: number;
+  swapsUsed: boolean; // has player used a swap
+  freezeUsed: boolean;
+  magnetUsed: boolean;
+  antigravUsed: boolean;
+  alignedPlanets: PlanetPos[];
+  boardOffsetY: number;
 }
+
+const STEPS_CONFIG: Record<TutStep, {
+  title: string;
+  subtitle: string;
+  pauseOrbits: boolean;
+  blockInput: boolean;
+  autoAdvance?: number; // ms to auto-advance
+  showHand?: boolean;
+  highlightPlanets?: boolean;
+  highlightButton?: 'freeze' | 'magnet' | 'antigrav';
+}> = {
+  welcome: {
+    title: 'Welcome to ORBITA!',
+    subtitle: 'Save planets from the dying star',
+    pauseOrbits: true,
+    blockInput: true,
+    autoAdvance: 3000,
+  },
+  swipe_explain: {
+    title: 'Same-color planets align...',
+    subtitle: 'See the glowing lines between them?',
+    pauseOrbits: true,
+    blockInput: true,
+    autoAdvance: 3500,
+    highlightPlanets: true,
+  },
+  swipe_demo: {
+    title: 'Swipe through all three!',
+    subtitle: 'Drag your finger across them',
+    pauseOrbits: true,
+    blockInput: true,
+    autoAdvance: 4000,
+    showHand: true,
+    highlightPlanets: true,
+  },
+  swipe_try: {
+    title: 'Your turn — swipe!',
+    subtitle: 'Wait for lines, then swipe through 3 planets',
+    pauseOrbits: false,
+    blockInput: false,
+  },
+  swap_explain: {
+    title: 'Cross-orbit SWAP',
+    subtitle: 'Tap a planet, then tap one on the next orbit when close',
+    pauseOrbits: true,
+    blockInput: true,
+    autoAdvance: 4000,
+  },
+  swap_try: {
+    title: 'Try a swap!',
+    subtitle: 'Tap 2 planets on adjacent orbits when they\'re near',
+    pauseOrbits: false,
+    blockInput: false,
+  },
+  freeze_explain: {
+    title: 'FREEZE power-up',
+    subtitle: 'Stops all orbits for 8 seconds — press it!',
+    pauseOrbits: true,
+    blockInput: true,
+    autoAdvance: 3000,
+    highlightButton: 'freeze',
+  },
+  freeze_try: {
+    title: 'Press FREEZE!',
+    subtitle: 'It will stop orbits so you can aim easily',
+    pauseOrbits: false,
+    blockInput: false,
+    highlightButton: 'freeze',
+  },
+  magnet_explain: {
+    title: 'MAGNET power-up',
+    subtitle: 'Pulls the nearest triple into alignment — press it!',
+    pauseOrbits: true,
+    blockInput: true,
+    autoAdvance: 3000,
+    highlightButton: 'magnet',
+  },
+  magnet_try: {
+    title: 'Press MAGNET!',
+    subtitle: 'It will align 3 planets for you',
+    pauseOrbits: false,
+    blockInput: false,
+    highlightButton: 'magnet',
+  },
+  antigrav_explain: {
+    title: 'ANTI-G power-up',
+    subtitle: 'Reshuffles all planets to new positions — press it!',
+    pauseOrbits: true,
+    blockInput: true,
+    autoAdvance: 3000,
+    highlightButton: 'antigrav',
+  },
+  antigrav_try: {
+    title: 'Press ANTI-G!',
+    subtitle: 'Use when you\'re stuck — it creates new opportunities',
+    pauseOrbits: false,
+    blockInput: false,
+    highlightButton: 'antigrav',
+  },
+  go: {
+    title: 'You\'re ready!',
+    subtitle: 'Rescue 9 planets before the star dies!',
+    pauseOrbits: false,
+    blockInput: true,
+    autoAdvance: 2500,
+  },
+  done: {
+    title: '',
+    subtitle: '',
+    pauseOrbits: false,
+    blockInput: false,
+  },
+};
+
+const STEP_ORDER: TutStep[] = [
+  'welcome',
+  'swipe_explain', 'swipe_demo', 'swipe_try',
+  'swap_explain', 'swap_try',
+  'freeze_explain', 'freeze_try',
+  'magnet_explain', 'magnet_try',
+  'antigrav_explain', 'antigrav_try',
+  'go', 'done',
+];
 
 export const Tutorial: React.FC<Props> = ({
   onComplete,
   setPaused,
-  firstMatchDone,
+  rescued,
+  swapsUsed,
+  freezeUsed,
+  magnetUsed,
+  antigravUsed,
   alignedPlanets,
   boardOffsetY,
 }) => {
-  const [step, setStep] = useState<TutorialStep>('look');
+  const [stepIndex, setStepIndex] = useState(0);
+  const step = STEP_ORDER[stepIndex] || 'done';
+  const config = STEPS_CONFIG[step];
+  const prevRescued = React.useRef(rescued);
 
-  // Hand position animated between first and last aligned planet
   const handProgress = useSharedValue(0);
   const handOpacity = useSharedValue(0);
   const pulseVal = useSharedValue(0.4);
 
-  // Pause orbits during teaching
+  // Pause/unpause orbits
   useEffect(() => {
-    if (step === 'look' || step === 'swipe_demo') {
-      setPaused(true);
-    } else {
-      setPaused(false);
-    }
-  }, [step, setPaused]);
+    setPaused(config.pauseOrbits);
+  }, [step, config.pauseOrbits, setPaused]);
 
-  // Step progression
+  // Auto-advance steps
   useEffect(() => {
-    if (step === 'look') {
-      pulseVal.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 600 }),
-          withTiming(0.3, { duration: 600 })
-        ),
-        -1,
-        true
-      );
-      const timer = setTimeout(() => setStep('swipe_demo'), 3500);
+    if (config.autoAdvance) {
+      const timer = setTimeout(() => advance(), config.autoAdvance);
       return () => clearTimeout(timer);
-    } else if (step === 'swipe_demo') {
-      // Animate hand along the aligned planets
-      handOpacity.value = withDelay(300, withTiming(1, { duration: 300 }));
-      handProgress.value = withDelay(600,
+    }
+  }, [stepIndex]);
+
+  // Detect player actions to advance "try" steps
+  useEffect(() => {
+    if (step === 'swipe_try' && rescued > prevRescued.current) {
+      prevRescued.current = rescued;
+      setTimeout(() => advance(), 1000);
+    }
+  }, [rescued, step]);
+
+  useEffect(() => {
+    if (step === 'swap_try' && swapsUsed) {
+      setTimeout(() => advance(), 1000);
+    }
+  }, [swapsUsed, step]);
+
+  useEffect(() => {
+    if (step === 'freeze_try' && freezeUsed) {
+      setTimeout(() => advance(), 1500);
+    }
+  }, [freezeUsed, step]);
+
+  useEffect(() => {
+    if (step === 'magnet_try' && magnetUsed) {
+      setTimeout(() => advance(), 1500);
+    }
+  }, [magnetUsed, step]);
+
+  useEffect(() => {
+    if (step === 'antigrav_try' && antigravUsed) {
+      setTimeout(() => advance(), 1500);
+    }
+  }, [antigravUsed, step]);
+
+  // Hand animation for swipe demo
+  useEffect(() => {
+    if (step === 'swipe_demo' && alignedPlanets.length >= 3) {
+      handOpacity.value = withDelay(500, withTiming(1, { duration: 300 }));
+      handProgress.value = withDelay(800,
         withRepeat(
           withSequence(
             withTiming(0, { duration: 0 }),
-            withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+            withTiming(1, { duration: 700, easing: Easing.inOut(Easing.ease) }),
             withTiming(1, { duration: 500 }),
           ),
-          4,
-          false
+          3, false
         )
       );
-      const timer = setTimeout(() => {
-        handOpacity.value = withTiming(0, { duration: 300 });
-        setStep('your_turn');
-      }, 6000);
-      return () => clearTimeout(timer);
+    } else {
+      handOpacity.value = 0;
     }
   }, [step]);
 
-  // Detect first match
+  // Pulse for highlights
   useEffect(() => {
-    if (step === 'your_turn' && firstMatchDone) {
-      setTimeout(() => { setStep('done'); onComplete(); }, 1000);
-    }
-  }, [firstMatchDone, step, onComplete]);
+    pulseVal.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 600 }),
+        withTiming(0.3, { duration: 600 })
+      ),
+      -1, true
+    );
+  }, []);
 
-  // Fallback auto-complete
-  useEffect(() => {
-    if (step === 'your_turn') {
-      const timer = setTimeout(() => { setStep('done'); onComplete(); }, 30000);
-      return () => clearTimeout(timer);
+  const advance = () => {
+    const next = stepIndex + 1;
+    if (next >= STEP_ORDER.length || STEP_ORDER[next] === 'done') {
+      onComplete();
+    } else {
+      setStepIndex(next);
     }
-  }, [step, onComplete]);
+  };
 
-  // Hand style: interpolate between first and last planet position
   const p0 = alignedPlanets[0];
   const p2 = alignedPlanets[2] || alignedPlanets[alignedPlanets.length - 1];
   const hasPositions = alignedPlanets.length >= 3 && p0 && p2;
 
   const handStyle = useAnimatedStyle(() => {
-    if (!hasPositions) {
-      return { opacity: 0 };
-    }
-    const x = p0.x + (p2.x - p0.x) * handProgress.value - 20;
-    const y = p0.y + (p2.y - p0.y) * handProgress.value + boardOffsetY - 20;
+    if (!hasPositions) return { opacity: 0 };
+    const x = p0.x + (p2.x - p0.x) * handProgress.value - 18;
+    const y = p0.y + (p2.y - p0.y) * handProgress.value + boardOffsetY - 18;
     return {
       transform: [{ translateX: x }, { translateY: y }],
       opacity: handOpacity.value,
@@ -127,36 +296,27 @@ export const Tutorial: React.FC<Props> = ({
 
   if (step === 'done') return null;
 
-  const isBlocking = step === 'look' || step === 'swipe_demo';
-
   return (
-    <View style={styles.overlay} pointerEvents={isBlocking ? 'box-only' : 'box-none'}>
-      {/* Dim during teaching */}
-      {isBlocking && (
+    <View style={styles.overlay} pointerEvents={config.blockInput ? 'box-only' : 'box-none'}>
+      {/* Dim during blocking steps */}
+      {config.blockInput && (
         <Animated.View
-          entering={FadeIn.duration(300)}
-          exiting={FadeOut.duration(300)}
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(200)}
           style={styles.dimOverlay}
           pointerEvents="none"
         />
       )}
 
-      {/* Highlight rings around aligned planets */}
-      {(step === 'look' || step === 'swipe_demo') && hasPositions && (
+      {/* Planet highlights */}
+      {config.highlightPlanets && hasPositions && (
         <Animated.View style={[styles.highlightContainer, pulseStyle]} pointerEvents="none">
           <Svg width={SCREEN_W} height={500} style={{ position: 'absolute', top: boardOffsetY }}>
-            {/* Connecting line through planets */}
-            <Line
-              x1={p0.x} y1={p0.y}
-              x2={p2.x} y2={p2.y}
-              stroke={p0.color}
-              strokeWidth={3}
-              strokeOpacity={0.6}
-            />
-            {/* Highlight circles */}
+            <Line x1={p0.x} y1={p0.y} x2={p2.x} y2={p2.y}
+              stroke={p0.color} strokeWidth={3} strokeOpacity={0.6} />
             {alignedPlanets.map((p, i) => (
               <React.Fragment key={i}>
-                <SvgCircle cx={p.x} cy={p.y} r={24} stroke={p.color} strokeWidth={3} fill="none" strokeOpacity={0.9} />
+                <SvgCircle cx={p.x} cy={p.y} r={24} stroke={p.color} strokeWidth={3} fill="none" />
                 <SvgCircle cx={p.x} cy={p.y} r={28} stroke={p.color} strokeWidth={1} fill="none" strokeOpacity={0.4} />
               </React.Fragment>
             ))}
@@ -164,43 +324,30 @@ export const Tutorial: React.FC<Props> = ({
         </Animated.View>
       )}
 
-      {/* Animated hand during swipe_demo */}
-      {step === 'swipe_demo' && hasPositions && (
+      {/* Hand gesture */}
+      {config.showHand && hasPositions && (
         <Animated.View style={[styles.hand, handStyle]} pointerEvents="none">
           <Text style={styles.handEmoji}>👆</Text>
         </Animated.View>
       )}
 
-      {/* Tutorial text */}
+      {/* Text */}
       <View style={styles.textContainer}>
-        <Animated.View entering={FadeIn.duration(400)} key={step}>
-          {step === 'look' && (
-            <>
-              <Text style={styles.mainText}>Same planets are aligning!</Text>
-              <Text style={styles.subText}>See the glowing circles and line?</Text>
-            </>
-          )}
-          {step === 'swipe_demo' && (
-            <>
-              <Text style={styles.mainText}>Swipe through all three!</Text>
-              <Text style={styles.subText}>Drag your finger across them to rescue</Text>
-            </>
-          )}
-          {step === 'your_turn' && (
-            <>
-              <Text style={styles.mainText}>Your turn!</Text>
-              <Text style={styles.subText}>Swipe when lines appear between 3 same planets</Text>
-            </>
-          )}
+        <Animated.View entering={FadeIn.duration(300)} key={stepIndex}>
+          <Text style={styles.mainText}>{config.title}</Text>
+          <Text style={styles.subText}>{config.subtitle}</Text>
+          {/* Step indicator */}
+          <View style={styles.stepDots}>
+            {STEP_ORDER.filter((s) => s !== 'done').map((_, i) => (
+              <View key={i} style={[styles.dot, i === stepIndex && styles.dotActive]} />
+            ))}
+          </View>
         </Animated.View>
       </View>
 
       {/* Skip */}
-      <TouchableOpacity
-        style={styles.skipButton}
-        onPress={() => { setStep('done'); onComplete(); }}
-      >
-        <Text style={styles.skipText}>Skip</Text>
+      <TouchableOpacity style={styles.skipButton} onPress={onComplete}>
+        <Text style={styles.skipText}>Skip tutorial</Text>
       </TouchableOpacity>
     </View>
   );
@@ -220,7 +367,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   textContainer: {
-    paddingHorizontal: 30,
+    paddingHorizontal: 24,
     paddingBottom: 140,
     alignItems: 'center',
   },
@@ -239,13 +386,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
+  stepDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  dotActive: {
+    backgroundColor: '#ffd700',
+    width: 16,
+  },
   hand: {
     position: 'absolute',
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
   },
   handEmoji: {
-    fontSize: 36,
+    fontSize: 32,
   },
   skipButton: {
     position: 'absolute',

@@ -16,6 +16,23 @@ export interface LevelConfig {
 
 export const LEVELS: LevelConfig[] = [
   {
+    id: 0,
+    name: 'Tutorial',
+    time: 300,
+    rescueTarget: 9,
+    swaps: 5,
+    planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
+    slots: [3, 3, 3],   // 9 planets — minimal, clear
+    speedMultiplier: 0.5,
+    alignmentTolerance: 30,
+    powerUps: [
+      { type: PowerUpType.STAR_FREEZE, uses: 1 },
+      { type: PowerUpType.NOVA_PULSE, uses: 1 },
+      { type: PowerUpType.ANTIGRAVITY, uses: 1 },
+    ],
+    newMechanic: 'Learn all game mechanics step by step!',
+  },
+  {
     id: 1,
     name: 'First Constellation',
     time: 180,

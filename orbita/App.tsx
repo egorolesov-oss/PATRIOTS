@@ -278,8 +278,8 @@ function GameScreen() {
         </Animated.View>
       )}
 
-      {/* Tutorial overlay on Level 1 */}
-      {state.phase === 'playing' && currentLevel.id === 1 && !tutorialCompleted && showTutorial && (
+      {/* Tutorial overlay on Level 0 */}
+      {state.phase === 'playing' && currentLevel.id === 0 && !tutorialCompleted && showTutorial && (
         <Tutorial
           onComplete={() => {
             setShowTutorial(false);
@@ -287,7 +287,11 @@ function GameScreen() {
             setTutorialPaused(false);
           }}
           setPaused={setTutorialPaused}
-          firstMatchDone={state.rescued > 0}
+          rescued={state.rescued}
+          swapsUsed={state.swapsLeft < currentLevel.swaps}
+          freezeUsed={state.powerUps.some((p) => p.type === 'STAR_FREEZE' && p.used)}
+          magnetUsed={state.powerUps.some((p) => p.type === 'NOVA_PULSE' && p.used)}
+          antigravUsed={state.powerUps.some((p) => p.type === 'ANTIGRAVITY' && p.used)}
           alignedPlanets={tutorialPlanets}
           boardOffsetY={boardTopOffset}
         />
@@ -302,7 +306,7 @@ function GameScreen() {
       )}
 
       {/* Won Screen */}
-      {state.phase === 'won' && !showLevelIntro && (
+      {state.phase === 'won' && !showLevelIntro && !showLevelSelect && (
         <Animated.View
           entering={FadeIn.duration(500)}
           style={styles.gameOverContainer}
@@ -350,7 +354,7 @@ function GameScreen() {
       )}
 
       {/* Game Over Screen — Supernova */}
-      {state.phase === 'gameover' && !showLevelIntro && (
+      {state.phase === 'gameover' && !showLevelIntro && !showLevelSelect && (
         <Animated.View
           entering={FadeIn.duration(500)}
           style={[styles.gameOverContainer, { backgroundColor: 'rgba(80, 10, 0, 0.85)' }]}
