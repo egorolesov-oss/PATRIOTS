@@ -7,6 +7,7 @@ import {
   PLANET_HITBOX,
   ROTATION_SLOWDOWN,
   SWAP_PROXIMITY,
+  PLANET_CONFIGS,
   Planet,
 } from '../types/game';
 import { getSlotPosition, getPlanetAngle } from '../engine/board';
@@ -28,6 +29,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     isPaused,
     swipe,
     alignedIds,
+    alignedTriples,
     proximityPairs,
     removingPlanetIds,
     newPlanetIds,
@@ -165,6 +167,34 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
                 strokeDasharray={isSwappable ? undefined : '3,3'}
                 strokeOpacity={isSwappable ? 0.8 : 0.3}
               />
+            );
+          })}
+          {/* Alignment lines through triples */}
+          {alignedTriples.map((triple, i) => {
+            const positions = triple.planets.map((p) =>
+              getSlotPosition(p.orbitIndex, p.slotIndex, centerX, centerY, rotationAngles[p.orbitIndex])
+            );
+            const color = PLANET_CONFIGS[triple.type].color;
+            const tight = triple.avgAngleDiff < 5;
+            return (
+              <React.Fragment key={`align-${i}`}>
+                <Line
+                  x1={positions[0].x} y1={positions[0].y}
+                  x2={positions[1].x} y2={positions[1].y}
+                  stroke={color}
+                  strokeWidth={tight ? 2.5 : 1}
+                  strokeOpacity={tight ? 0.8 : 0.3}
+                  strokeDasharray={tight ? undefined : '4,4'}
+                />
+                <Line
+                  x1={positions[1].x} y1={positions[1].y}
+                  x2={positions[2].x} y2={positions[2].y}
+                  stroke={color}
+                  strokeWidth={tight ? 2.5 : 1}
+                  strokeOpacity={tight ? 0.8 : 0.3}
+                  strokeDasharray={tight ? undefined : '4,4'}
+                />
+              </React.Fragment>
             );
           })}
         </Svg>

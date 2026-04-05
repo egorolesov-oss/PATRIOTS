@@ -94,16 +94,23 @@ export function isValidSwipe(collected: Planet[]): boolean {
   return orbits.size === collected.length; // each on a different orbit
 }
 
+export interface AlignedTriple {
+  planets: [Planet, Planet, Planet];
+  type: PlanetType;
+  avgAngleDiff: number;
+}
+
 /**
  * Find groups of same-type planets that are nearly aligned across orbits.
- * Returns planet IDs that are part of any potential alignment (within tolerance).
+ * Returns both the set of IDs and the actual triples for drawing lines.
  */
 export function findAlignedGroups(
   planets: Planet[],
   rotationAngles: number[],
   tolerance: number = 15
-): Set<string> {
+): { ids: Set<string>; triples: AlignedTriple[] } {
   const ids = new Set<string>();
+  const triples: AlignedTriple[] = [];
   const byType: Record<string, Planet[]> = {};
 
   for (const p of planets) {
@@ -113,12 +120,10 @@ export function findAlignedGroups(
 
   for (const type of Object.keys(byType)) {
     const group = byType[type];
-    // Need planets on all 3 orbits
     const byOrbit: Planet[][] = [[], [], []];
     for (const p of group) byOrbit[p.orbitIndex].push(p);
     if (byOrbit[0].length === 0 || byOrbit[1].length === 0 || byOrbit[2].length === 0) continue;
 
-    // Check all triples (one per orbit)
     for (const p0 of byOrbit[0]) {
       const a0 = getPlanetAngle(p0, rotationAngles);
       for (const p1 of byOrbit[1]) {
@@ -126,17 +131,25 @@ export function findAlignedGroups(
         if (angleDiff(a0, a1) >= tolerance) continue;
         for (const p2 of byOrbit[2]) {
           const a2 = getPlanetAngle(p2, rotationAngles);
-          if (angleDiff(a0, a2) < tolerance && angleDiff(a1, a2) < tolerance) {
+          const d01 = angleDiff(a0, a1);
+          const d02 = angleDiff(a0, a2);
+          const d12 = angleDiff(a1, a2);
+          if (d02 < tolerance && d12 < tolerance) {
             ids.add(p0.id);
             ids.add(p1.id);
             ids.add(p2.id);
+            triples.push({
+              planets: [p0, p1, p2],
+              type: type as PlanetType,
+              avgAngleDiff: (d01 + d02 + d12) / 3,
+            });
           }
         }
       }
     }
   }
 
-  return ids;
+  return { ids, triples };
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   findAlignedGroups,
   findProximityPairs,
   canSwapPlanets,
+  AlignedTriple,
   isValidSwipe,
   calculateScore,
   ProximityPair,
@@ -31,6 +32,7 @@ export interface UseGameStateReturn {
   isPaused: boolean;
   swipe: SwipeState;
   alignedIds: Set<string>;
+  alignedTriples: AlignedTriple[];
   proximityPairs: ProximityPair[];
   removingPlanetIds: Set<string>;
   newPlanetIds: Set<string>;
@@ -66,6 +68,7 @@ export function useGameState(): UseGameStateReturn {
     matchType: null,
   });
   const [alignedIds, setAlignedIds] = useState<Set<string>>(new Set());
+  const [alignedTriples, setAlignedTriples] = useState<AlignedTriple[]>([]);
   const [proximityPairs, setProximityPairs] = useState<ProximityPair[]>([]);
   const [removingPlanetIds, setRemovingPlanetIds] = useState<Set<string>>(new Set());
   const [newPlanetIds, setNewPlanetIds] = useState<Set<string>>(new Set());
@@ -80,7 +83,9 @@ export function useGameState(): UseGameStateReturn {
   const updateIndicators = useCallback(() => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
     const angles = rotationAnglesRef.current;
-    setAlignedIds(findAlignedGroups(stateRef.current.planets, angles, 15));
+    const result = findAlignedGroups(stateRef.current.planets, angles, 15);
+    setAlignedIds(result.ids);
+    setAlignedTriples(result.triples);
     setProximityPairs(findProximityPairs(stateRef.current.planets, angles));
   }, []);
 
@@ -99,6 +104,7 @@ export function useGameState(): UseGameStateReturn {
       bestScore: stateRef.current.bestScore,
     });
     setAlignedIds(new Set());
+    setAlignedTriples([]);
     setProximityPairs([]);
     setRemovingPlanetIds(new Set());
     setNewPlanetIds(new Set());
@@ -321,6 +327,7 @@ export function useGameState(): UseGameStateReturn {
     isPaused,
     swipe,
     alignedIds,
+    alignedTriples,
     proximityPairs,
     removingPlanetIds,
     newPlanetIds,
