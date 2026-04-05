@@ -85,7 +85,7 @@ export function getPlanetAngle(planet: Planet, rotationAngles: number[]): number
  * - At least 2 planets (2 orbits), ideally 3 (all orbits)
  */
 export function isValidSwipe(collected: Planet[]): boolean {
-  if (collected.length < 2) return false;
+  if (collected.length < 3) return false;
   const type = collected[0].type;
   if (!collected.every((p) => p.type === type)) return false;
   const orbits = new Set(collected.map((p) => p.orbitIndex));
@@ -111,24 +111,23 @@ export function findAlignedGroups(
 
   for (const type of Object.keys(byType)) {
     const group = byType[type];
-    // Check all pairs across different orbits
-    for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        if (group[i].orbitIndex === group[j].orbitIndex) continue;
-        const a1 = getPlanetAngle(group[i], rotationAngles);
-        const a2 = getPlanetAngle(group[j], rotationAngles);
-        if (angleDiff(a1, a2) < tolerance) {
-          ids.add(group[i].id);
-          ids.add(group[j].id);
-          // Check for third planet on remaining orbit
-          for (let k = 0; k < group.length; k++) {
-            if (k === i || k === j) continue;
-            if (group[k].orbitIndex === group[i].orbitIndex ||
-                group[k].orbitIndex === group[j].orbitIndex) continue;
-            const a3 = getPlanetAngle(group[k], rotationAngles);
-            if (angleDiff(a3, a1) < tolerance && angleDiff(a3, a2) < tolerance) {
-              ids.add(group[k].id);
-            }
+    // Need planets on all 3 orbits
+    const byOrbit: Planet[][] = [[], [], []];
+    for (const p of group) byOrbit[p.orbitIndex].push(p);
+    if (byOrbit[0].length === 0 || byOrbit[1].length === 0 || byOrbit[2].length === 0) continue;
+
+    // Check all triples (one per orbit)
+    for (const p0 of byOrbit[0]) {
+      const a0 = getPlanetAngle(p0, rotationAngles);
+      for (const p1 of byOrbit[1]) {
+        const a1 = getPlanetAngle(p1, rotationAngles);
+        if (angleDiff(a0, a1) >= tolerance) continue;
+        for (const p2 of byOrbit[2]) {
+          const a2 = getPlanetAngle(p2, rotationAngles);
+          if (angleDiff(a0, a2) < tolerance && angleDiff(a1, a2) < tolerance) {
+            ids.add(p0.id);
+            ids.add(p1.id);
+            ids.add(p2.id);
           }
         }
       }
@@ -139,7 +138,7 @@ export function findAlignedGroups(
 }
 
 export function calculateScore(matchCount: number, combo: number): number {
-  const base = matchCount === 2 ? 200 : matchCount === 3 ? 500 : 800;
+  const base = matchCount === 3 ? 500 : 1000;
   let multiplier = 1;
   if (combo >= 4) multiplier = 3;
   else if (combo >= 3) multiplier = 2.5;
