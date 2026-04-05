@@ -5,15 +5,17 @@ import {
   PowerUpType,
   PowerUpState,
   SwipeState,
-  INITIAL_MOVES,
+  INITIAL_SWAPS,
   ORBIT_CONFIGS,
 } from '../types/game';
 import {
   generateBoard,
   findAlignedGroups,
+  findProximityPairs,
+  canSwapPlanets,
   isValidSwipe,
   calculateScore,
-  fillEmptySlots,
+  ProximityPair,
 } from '../engine/board';
 
 const initialPowerUps: PowerUpState[] = [
@@ -29,25 +31,24 @@ export interface UseGameStateReturn {
   isPaused: boolean;
   swipe: SwipeState;
   alignedIds: Set<string>;
+  proximityPairs: ProximityPair[];
   removingPlanetIds: Set<string>;
   newPlanetIds: Set<string>;
-  swapPair: { a: Planet; b: Planet } | null;
   startGame: () => void;
   selectPlanet: (planet: Planet) => void;
   onSwipeStart: (planet: Planet) => void;
   onSwipeThrough: (planet: Planet) => void;
   onSwipeEnd: () => void;
   usePowerUp: (type: PowerUpType) => void;
-  onSwapComplete: () => void;
   setRotationAngles: React.Dispatch<React.SetStateAction<number[]>>;
-  updateAligned: () => void;
+  updateIndicators: () => void;
 }
 
 export function useGameState(): UseGameStateReturn {
   const [state, setState] = useState<GameState>({
     planets: [],
     score: 0,
-    movesLeft: INITIAL_MOVES,
+    swapsLeft: INITIAL_SWAPS,
     selectedPlanetId: null,
     phase: 'title',
     powerUps: initialPowerUps.map((p) => ({ ...p })),
@@ -65,9 +66,9 @@ export function useGameState(): UseGameStateReturn {
     matchType: null,
   });
   const [alignedIds, setAlignedIds] = useState<Set<string>>(new Set());
+  const [proximityPairs, setProximityPairs] = useState<ProximityPair[]>([]);
   const [removingPlanetIds, setRemovingPlanetIds] = useState<Set<string>>(new Set());
   const [newPlanetIds, setNewPlanetIds] = useState<Set<string>>(new Set());
-  const [swapPair, setSwapPair] = useState<{ a: Planet; b: Planet } | null>(null);
   const processingRef = useRef(false);
   const freezeActiveRef = useRef(false);
   const freezeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -76,14 +77,11 @@ export function useGameState(): UseGameStateReturn {
   const rotationAnglesRef = useRef(rotationAngles);
   rotationAnglesRef.current = rotationAngles;
 
-  const updateAligned = useCallback(() => {
+  const updateIndicators = useCallback(() => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
-    const ids = findAlignedGroups(
-      stateRef.current.planets,
-      rotationAnglesRef.current,
-      15 // tolerance degrees
-    );
-    setAlignedIds(ids);
+    const angles = rotationAnglesRef.current;
+    setAlignedIds(findAlignedGroups(stateRef.current.planets, angles, 15));
+    setProximityPairs(findProximityPairs(stateRef.current.planets, angles));
   }, []);
 
   const startGame = useCallback(() => {
@@ -93,7 +91,7 @@ export function useGameState(): UseGameStateReturn {
     setState({
       planets,
       score: 0,
-      movesLeft: INITIAL_MOVES,
+      swapsLeft: INITIAL_SWAPS,
       selectedPlanetId: null,
       phase: 'playing',
       powerUps: initialPowerUps.map((p) => ({ ...p })),
@@ -101,9 +99,9 @@ export function useGameState(): UseGameStateReturn {
       bestScore: stateRef.current.bestScore,
     });
     setAlignedIds(new Set());
+    setProximityPairs([]);
     setRemovingPlanetIds(new Set());
     setNewPlanetIds(new Set());
-    setSwapPair(null);
     setRotationAngles([0, 0, 0]);
     setIsPaused(false);
     setIsSwiping(false);
@@ -115,7 +113,6 @@ export function useGameState(): UseGameStateReturn {
 
   const onSwipeStart = useCallback((planet: Planet) => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
-
     setIsSwiping(true);
     setSwipe({
       active: true,
@@ -128,13 +125,8 @@ export function useGameState(): UseGameStateReturn {
 
   const onSwipeThrough = useCallback((planet: Planet) => {
     if (!swipe.active) return;
-    // Must be same type, different orbit, not already collected
-    if (
-      planet.type !== swipe.matchType ||
-      swipe.collectedIds.includes(planet.id)
-    ) return;
-
-    // Must be on a different orbit than all already collected
+    if (planet.type !== swipe.matchType || swipe.collectedIds.includes(planet.id)) return;
+    // Must be on a different orbit
     const collectedPlanets = stateRef.current.planets.filter(
       (p) => swipe.collectedIds.includes(p.id)
     );
@@ -158,7 +150,6 @@ export function useGameState(): UseGameStateReturn {
     );
 
     if (isValidSwipe(collected)) {
-      // Valid match!
       processingRef.current = true;
       const matchIds = new Set(swipe.collectedIds);
       const newCombo = stateRef.current.combo + 1;
@@ -170,7 +161,6 @@ export function useGameState(): UseGameStateReturn {
         setState((prev) => {
           const remaining = prev.planets.filter((p) => !matchIds.has(p.id));
           setRemovingPlanetIds(new Set());
-
           return {
             ...prev,
             planets: remaining,
@@ -180,13 +170,11 @@ export function useGameState(): UseGameStateReturn {
         });
 
         setTimeout(() => {
-          setNewPlanetIds(new Set());
           processingRef.current = false;
           if (!freezeActiveRef.current) setIsPaused(false);
-        }, 600);
+        }, 400);
       }, 500);
     } else {
-      // Invalid swipe — reset combo
       setState((prev) => ({ ...prev, combo: 0 }));
     }
 
@@ -194,7 +182,7 @@ export function useGameState(): UseGameStateReturn {
     setSwipe({ active: false, orbitIndex: -1, collectedIds: [], matchType: null });
   }, [swipe]);
 
-  // --- TAP TO SWAP ---
+  // --- CROSS-ORBIT TAP SWAP ---
 
   const selectPlanet = useCallback((planet: Planet) => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
@@ -215,45 +203,45 @@ export function useGameState(): UseGameStateReturn {
     const selectedPlanet = stateRef.current.planets.find((p) => p.id === currentSelected);
     if (!selectedPlanet) return;
 
-    if (selectedPlanet.orbitIndex !== planet.orbitIndex) {
+    // Cross-orbit swap: must be different orbit, adjacent, and close enough
+    if (selectedPlanet.orbitIndex === planet.orbitIndex) {
+      // Same orbit — just re-select
       setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
       return;
     }
 
-    if (stateRef.current.movesLeft <= 0) return;
-    setSwapPair({ a: selectedPlanet, b: planet });
-    setState((prev) => ({
-      ...prev,
-      selectedPlanetId: null,
-      movesLeft: prev.movesLeft - 1,
-    }));
-  }, [isSwiping]);
+    if (stateRef.current.swapsLeft <= 0) {
+      setState((prev) => ({ ...prev, selectedPlanetId: null }));
+      return;
+    }
 
-  const onSwapComplete = useCallback(() => {
-    if (!swapPair) return;
-    const { a, b } = swapPair;
+    // Check proximity
+    if (!canSwapPlanets(selectedPlanet, planet, rotationAnglesRef.current)) {
+      // Too far apart — re-select
+      setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
+      return;
+    }
 
+    // Valid cross-orbit swap!
     setState((prev) => {
       const planets = prev.planets.map((p) => {
-        if (p.id === a.id) return { ...p, slotIndex: b.slotIndex };
-        if (p.id === b.id) return { ...p, slotIndex: a.slotIndex };
+        if (p.id === selectedPlanet.id) {
+          return { ...p, orbitIndex: planet.orbitIndex, slotIndex: planet.slotIndex };
+        }
+        if (p.id === planet.id) {
+          return { ...p, orbitIndex: selectedPlanet.orbitIndex, slotIndex: selectedPlanet.slotIndex };
+        }
         return p;
       });
 
-      if (prev.movesLeft <= 0) {
-        return {
-          ...prev,
-          planets,
-          phase: 'gameover',
-          bestScore: Math.max(prev.bestScore, prev.score),
-        };
-      }
-
-      return { ...prev, planets };
+      return {
+        ...prev,
+        planets,
+        selectedPlanetId: null,
+        swapsLeft: prev.swapsLeft - 1,
+      };
     });
-
-    setSwapPair(null);
-  }, [swapPair]);
+  }, [isSwiping]);
 
   // --- POWER-UPS ---
 
@@ -306,10 +294,8 @@ export function useGameState(): UseGameStateReturn {
         break;
       }
       case PowerUpType.ANTIGRAVITY: {
-        // Shake/shuffle: randomly reassign planet types across all occupied slots
         setState((prev) => {
           const types = prev.planets.map((p) => p.type);
-          // Fisher-Yates shuffle
           for (let i = types.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [types[i], types[j]] = [types[j], types[i]];
@@ -335,17 +321,16 @@ export function useGameState(): UseGameStateReturn {
     isPaused,
     swipe,
     alignedIds,
+    proximityPairs,
     removingPlanetIds,
     newPlanetIds,
-    swapPair,
     startGame,
     selectPlanet,
     onSwipeStart,
     onSwipeThrough,
     onSwipeEnd,
     usePowerUp,
-    onSwapComplete,
     setRotationAngles,
-    updateAligned,
+    updateIndicators,
   };
 }

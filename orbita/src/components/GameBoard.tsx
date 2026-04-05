@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   ORBIT_CONFIGS,
-  PLANET_SIZE,
   PLANET_HITBOX,
   ROTATION_SLOWDOWN,
+  SWAP_PROXIMITY,
   Planet,
 } from '../types/game';
-import { getSlotPosition } from '../engine/board';
+import { getSlotPosition, getPlanetAngle } from '../engine/board';
 import { StarCore } from './StarCore';
 import { OrbitalRings } from './OrbitalRings';
 import { PlanetView } from './PlanetView';
@@ -27,25 +28,23 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     isPaused,
     swipe,
     alignedIds,
+    proximityPairs,
     removingPlanetIds,
     newPlanetIds,
-    swapPair,
     selectPlanet,
     onSwipeStart,
     onSwipeThrough,
     onSwipeEnd,
-    onSwapComplete,
     setRotationAngles,
-    updateAligned,
+    updateIndicators,
   } = game;
 
   const centerX = boardSize / 2;
   const centerY = boardSize / 2;
   const animFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
-  const matchTickRef = useRef<number>(0);
+  const tickRef = useRef<number>(0);
 
-  // Orbital rotation + matchable updates
   useEffect(() => {
     if (state.phase !== 'playing') return;
 
@@ -66,11 +65,10 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
         });
       }
 
-      // Update matchable highlights every ~300ms
-      matchTickRef.current += dt;
-      if (matchTickRef.current > 0.3) {
-        matchTickRef.current = 0;
-        updateAligned();
+      tickRef.current += dt;
+      if (tickRef.current > 0.2) {
+        tickRef.current = 0;
+        updateIndicators();
       }
 
       animFrameRef.current = requestAnimationFrame(animate);
@@ -83,7 +81,6 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
     };
   }, [state.phase, isPaused, isSwiping]);
 
-  // Find nearest planet to a touch point
   const findNearestPlanet = useCallback(
     (touchX: number, touchY: number): Planet | null => {
       let best: Planet | null = null;
@@ -91,11 +88,8 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
 
       for (const planet of state.planets) {
         const pos = getSlotPosition(
-          planet.orbitIndex,
-          planet.slotIndex,
-          centerX,
-          centerY,
-          rotationAngles[planet.orbitIndex]
+          planet.orbitIndex, planet.slotIndex,
+          centerX, centerY, rotationAngles[planet.orbitIndex]
         );
         const dx = touchX - pos.x;
         const dy = touchY - pos.y;
@@ -105,76 +99,75 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
           best = planet;
         }
       }
-
       return best;
     },
     [state.planets, centerX, centerY, rotationAngles]
   );
 
-  // Pan gesture for swiping through planets
   const panGesture = Gesture.Pan()
     .onStart((event) => {
       const planet = findNearestPlanet(event.x, event.y);
-      if (planet) {
-        onSwipeStart(planet);
-      }
+      if (planet) onSwipeStart(planet);
     })
     .onUpdate((event) => {
       if (!swipe.active) return;
       const planet = findNearestPlanet(event.x, event.y);
-      if (planet) {
-        onSwipeThrough(planet);
-      }
+      if (planet) onSwipeThrough(planet);
     })
-    .onEnd(() => {
-      onSwipeEnd();
-    })
-    .onFinalize(() => {
-      onSwipeEnd();
-    });
+    .onEnd(() => onSwipeEnd())
+    .onFinalize(() => onSwipeEnd());
 
-  // Tap gesture for selecting/swapping planets
   const tapGesture = Gesture.Tap().onEnd((event) => {
     const planet = findNearestPlanet(event.x, event.y);
-    if (planet) {
-      selectPlanet(planet);
-    }
+    if (planet) selectPlanet(planet);
   });
 
   const composed = Gesture.Exclusive(panGesture, tapGesture);
 
-  const getSwapTarget = useCallback(
-    (planet: Planet): { x: number; y: number } | null => {
-      if (!swapPair) return null;
-      if (planet.id === swapPair.a.id) {
-        return getSlotPosition(
-          swapPair.b.orbitIndex, swapPair.b.slotIndex,
-          centerX, centerY, rotationAngles[swapPair.b.orbitIndex]
-        );
-      }
-      if (planet.id === swapPair.b.id) {
-        return getSlotPosition(
-          swapPair.a.orbitIndex, swapPair.a.slotIndex,
-          centerX, centerY, rotationAngles[swapPair.a.orbitIndex]
-        );
-      }
-      return null;
-    },
-    [swapPair, centerX, centerY, rotationAngles]
-  );
-
   const collectedSet = new Set(swipe.collectedIds);
+
+  // Check if selected planet can swap with each proximity pair partner
+  const selectedPlanet = state.selectedPlanetId
+    ? state.planets.find((p) => p.id === state.selectedPlanetId)
+    : null;
 
   return (
     <GestureDetector gesture={composed}>
       <View style={[styles.container, { width: boardSize, height: boardSize }]}>
         <OrbitalRings
-          centerX={centerX}
-          centerY={centerY}
-          width={boardSize}
-          height={boardSize}
+          centerX={centerX} centerY={centerY}
+          width={boardSize} height={boardSize}
           activeSpokeAngle={null}
         />
+
+        {/* Proximity lines between close cross-orbit planets */}
+        <Svg width={boardSize} height={boardSize} style={StyleSheet.absoluteFill} pointerEvents="none">
+          {proximityPairs.map((pair, i) => {
+            const posA = getSlotPosition(
+              pair.a.orbitIndex, pair.a.slotIndex,
+              centerX, centerY, rotationAngles[pair.a.orbitIndex]
+            );
+            const posB = getSlotPosition(
+              pair.b.orbitIndex, pair.b.slotIndex,
+              centerX, centerY, rotationAngles[pair.b.orbitIndex]
+            );
+            const isSwappable = pair.canSwap;
+            const involvesSelected = selectedPlanet &&
+              (pair.a.id === selectedPlanet.id || pair.b.id === selectedPlanet.id);
+
+            return (
+              <Line
+                key={`prox-${i}`}
+                x1={posA.x} y1={posA.y}
+                x2={posB.x} y2={posB.y}
+                stroke={involvesSelected && isSwappable ? '#ffd700' : 'rgba(255,255,255,0.15)'}
+                strokeWidth={involvesSelected && isSwappable ? 2 : 0.5}
+                strokeDasharray={isSwappable ? undefined : '3,3'}
+                strokeOpacity={isSwappable ? 0.8 : 0.3}
+              />
+            );
+          })}
+        </Svg>
 
         <StarCore centerX={centerX} centerY={centerY} />
 
@@ -191,10 +184,6 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
             isMatchable={alignedIds.has(planet.id)}
             isCollected={collectedSet.has(planet.id)}
             onTap={selectPlanet}
-            swapTarget={getSwapTarget(planet)}
-            onSwapComplete={
-              swapPair && planet.id === swapPair.a.id ? onSwapComplete : undefined
-            }
           />
         ))}
 

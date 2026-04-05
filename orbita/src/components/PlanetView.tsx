@@ -9,9 +9,8 @@ import Animated, {
   withDelay,
   withRepeat,
   Easing,
-  runOnJS,
 } from 'react-native-reanimated';
-import { Planet, PLANET_CONFIGS, PLANET_SIZE, ORBIT_CONFIGS } from '../types/game';
+import { Planet, PLANET_CONFIGS, PLANET_SIZE } from '../types/game';
 import { getSlotPosition } from '../engine/board';
 
 const PLANET_SPRITES: Record<string, any> = {
@@ -34,8 +33,6 @@ interface Props {
   isMatchable: boolean;
   isCollected: boolean;
   onTap: (planet: Planet) => void;
-  swapTarget?: { x: number; y: number } | null;
-  onSwapComplete?: () => void;
 }
 
 export const PlanetView: React.FC<Props> = ({
@@ -49,8 +46,6 @@ export const PlanetView: React.FC<Props> = ({
   isMatchable,
   isCollected,
   onTap,
-  swapTarget,
-  onSwapComplete,
 }) => {
   const config = PLANET_CONFIGS[planet.type];
   const pos = getSlotPosition(planet.orbitIndex, planet.slotIndex, centerX, centerY, rotationAngle);
@@ -62,11 +57,9 @@ export const PlanetView: React.FC<Props> = ({
   const glowOpacity = useSharedValue(0);
 
   useEffect(() => {
-    if (!swapTarget) {
-      translateX.value = pos.x - PLANET_SIZE / 2;
-      translateY.value = pos.y - PLANET_SIZE / 2;
-    }
-  }, [pos.x, pos.y, swapTarget]);
+    translateX.value = pos.x - PLANET_SIZE / 2;
+    translateY.value = pos.y - PLANET_SIZE / 2;
+  }, [pos.x, pos.y]);
 
   // Selected
   useEffect(() => {
@@ -121,28 +114,6 @@ export const PlanetView: React.FC<Props> = ({
     }
   }, [isNew]);
 
-  // Swap animation
-  useEffect(() => {
-    if (swapTarget && onSwapComplete) {
-      const orbitRadius = ORBIT_CONFIGS[planet.orbitIndex].radius;
-      const startAngle = Math.atan2(pos.y - centerY, pos.x - centerX);
-      const endAngle = Math.atan2(swapTarget.y - centerY, swapTarget.x - centerX);
-      const midAngle = (startAngle + endAngle) / 2;
-      const midX = centerX + orbitRadius * Math.cos(midAngle) - PLANET_SIZE / 2;
-      const midY = centerY + orbitRadius * Math.sin(midAngle) - PLANET_SIZE / 2;
-
-      translateX.value = withSequence(
-        withTiming(midX, { duration: 150, easing: Easing.in(Easing.ease) }),
-        withTiming(swapTarget.x - PLANET_SIZE / 2, { duration: 150, easing: Easing.out(Easing.ease) })
-      );
-      translateY.value = withSequence(
-        withTiming(midY, { duration: 150, easing: Easing.in(Easing.ease) }),
-        withTiming(swapTarget.y - PLANET_SIZE / 2, { duration: 150, easing: Easing.out(Easing.ease) }, () => {
-          runOnJS(onSwapComplete)();
-        })
-      );
-    }
-  }, [swapTarget]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [

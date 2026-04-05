@@ -41,7 +41,7 @@ function GameScreen() {
     }
   }, [showTitle]);
 
-  const progressWidth = (state.movesLeft / 30) * 100;
+  const progressWidth = (state.swapsLeft / 7) * 100;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -81,8 +81,8 @@ function GameScreen() {
             )}
             <View style={styles.movesContainer}>
               <Text style={styles.movesLabel}>SWAPS</Text>
-              <Text style={[styles.movesValue, state.movesLeft <= 5 && styles.movesLow]}>
-                {state.movesLeft}
+              <Text style={[styles.movesValue, state.swapsLeft <= 2 && styles.movesLow]}>
+                {state.swapsLeft}
               </Text>
             </View>
           </View>
