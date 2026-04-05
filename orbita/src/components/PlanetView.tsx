@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Image } from 'react-native';
+import { StyleSheet, Image, View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,6 +10,7 @@ import Animated, {
   withRepeat,
   Easing,
 } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import { Planet, PLANET_CONFIGS, PLANET_SIZE } from '../types/game';
 import { getSlotPosition } from '../engine/board';
 
@@ -179,6 +180,15 @@ export const PlanetView: React.FC<Props> = ({
 
   const sprite = PLANET_SPRITES[config.sprite];
 
+  // Calculate lighting direction: gradient points FROM star center TO planet
+  // So the sun-facing side (toward center) is bright, far side is dark
+  const angleToCenter = Math.atan2(centerY - pos.y, centerX - pos.x);
+  // SVG gradient coordinates: (x1,y1) = lit side (toward star), (x2,y2) = dark side
+  const gradX1 = 50 + Math.cos(angleToCenter) * 50;
+  const gradY1 = 50 + Math.sin(angleToCenter) * 50;
+  const gradX2 = 50 - Math.cos(angleToCenter) * 50;
+  const gradY2 = 50 - Math.sin(angleToCenter) * 50;
+
   return (
     <Animated.View style={[styles.planetContainer, animatedStyle]}>
       <Animated.View
@@ -191,6 +201,28 @@ export const PlanetView: React.FC<Props> = ({
       <Animated.View style={spinStyle}>
         <Image source={sprite} style={styles.planetImage} resizeMode="cover" />
       </Animated.View>
+      {/* Lighting overlay — sunlit side bright, shadow side dark */}
+      <View style={styles.lightingOverlay} pointerEvents="none">
+        <Svg width={PLANET_SIZE} height={PLANET_SIZE}>
+          <Defs>
+            <LinearGradient
+              id={`light-${planet.id}`}
+              x1={`${gradX1}%`} y1={`${gradY1}%`}
+              x2={`${gradX2}%`} y2={`${gradY2}%`}
+            >
+              <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
+              <Stop offset="40%" stopColor="#000000" stopOpacity="0" />
+              <Stop offset="100%" stopColor="#000000" stopOpacity="0.4" />
+            </LinearGradient>
+          </Defs>
+          <Circle
+            cx={PLANET_SIZE / 2}
+            cy={PLANET_SIZE / 2}
+            r={PLANET_SIZE / 2 - 1}
+            fill={`url(#light-${planet.id})`}
+          />
+        </Svg>
+      </View>
     </Animated.View>
   );
 };
@@ -207,6 +239,11 @@ const styles = StyleSheet.create({
     width: PLANET_SIZE,
     height: PLANET_SIZE,
     borderRadius: PLANET_SIZE / 2,
+  },
+  lightingOverlay: {
+    position: 'absolute',
+    width: PLANET_SIZE,
+    height: PLANET_SIZE,
   },
   glow: {
     position: 'absolute',
