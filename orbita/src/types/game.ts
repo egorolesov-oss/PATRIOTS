@@ -84,20 +84,41 @@ export interface StarPhase {
   label: string;
 }
 
-export const STAR_PHASES: StarPhase[] = [
-  { color: '#ffffff', glowColor: '#ffd700', scale: 1.0, label: 'Stable' },       // >80%
-  { color: '#fff4cc', glowColor: '#ffaa00', scale: 0.95, label: 'Warming' },     // 60-80%
-  { color: '#ffaa44', glowColor: '#ff6600', scale: 0.90, label: 'Unstable' },    // 40-60%
-  { color: '#ff6633', glowColor: '#ff2200', scale: 0.85, label: 'Critical' },    // 20-40%
-  { color: '#cc2200', glowColor: '#880000', scale: 0.80, label: 'Collapsing' },  // <20%
+// Smooth interpolation between colors
+function lerpColor(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const r = Math.round(((pa >> 16) & 255) * (1 - t) + ((pb >> 16) & 255) * t);
+  const g = Math.round(((pa >> 8) & 255) * (1 - t) + ((pb >> 8) & 255) * t);
+  const bl = Math.round((pa & 255) * (1 - t) + (pb & 255) * t);
+  return `#${((r << 16) | (g << 8) | bl).toString(16).padStart(6, '0')}`;
+}
+
+const STAR_STOPS = [
+  { at: 1.0, color: '#ffffff', glow: '#ffd700' },
+  { at: 0.7, color: '#fff8dd', glow: '#ffcc44' },
+  { at: 0.4, color: '#ffaa44', glow: '#ff7700' },
+  { at: 0.2, color: '#ff5522', glow: '#ff2200' },
+  { at: 0.0, color: '#aa1100', glow: '#660000' },
 ];
 
 export function getStarPhase(timeRatio: number): StarPhase {
-  if (timeRatio > 0.8) return STAR_PHASES[0];
-  if (timeRatio > 0.6) return STAR_PHASES[1];
-  if (timeRatio > 0.4) return STAR_PHASES[2];
-  if (timeRatio > 0.2) return STAR_PHASES[3];
-  return STAR_PHASES[4];
+  const r = Math.max(0, Math.min(1, timeRatio));
+  // Find two stops to interpolate between
+  for (let i = 0; i < STAR_STOPS.length - 1; i++) {
+    const a = STAR_STOPS[i];
+    const b = STAR_STOPS[i + 1];
+    if (r <= a.at && r >= b.at) {
+      const t = 1 - (r - b.at) / (a.at - b.at);
+      return {
+        color: lerpColor(a.color, b.color, t),
+        glowColor: lerpColor(a.glow, b.glow, t),
+        scale: 0.7 + r * 0.6, // 1.3 at full → 0.7 at death
+        label: '',
+      };
+    }
+  }
+  return { color: '#ffffff', glowColor: '#ffd700', scale: 1.3, label: '' };
 }
 
 export const STAR_SIZE = 50;
