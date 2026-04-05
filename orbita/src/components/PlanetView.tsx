@@ -49,10 +49,11 @@ export const PlanetView: React.FC<Props> = ({
   onTap,
 }) => {
   const config = PLANET_CONFIGS[planet.type];
+  const pSize = config.size;
   const pos = getSlotPosition(planet.orbitIndex, planet.slotIndex, centerX, centerY, rotationAngle);
 
-  const translateX = useSharedValue(pos.x - PLANET_SIZE / 2);
-  const translateY = useSharedValue(pos.y - PLANET_SIZE / 2);
+  const translateX = useSharedValue(pos.x - pSize / 2);
+  const translateY = useSharedValue(pos.y - pSize / 2);
   const scaleVal = useSharedValue(isNew ? 0 : 1);
   const opacityVal = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
@@ -83,8 +84,8 @@ export const PlanetView: React.FC<Props> = ({
     prevOrbitRef.current = planet.orbitIndex;
     prevSlotRef.current = planet.slotIndex;
 
-    const targetX = pos.x - PLANET_SIZE / 2;
-    const targetY = pos.y - PLANET_SIZE / 2;
+    const targetX = pos.x - pSize / 2;
+    const targetY = pos.y - pSize / 2;
 
     if (wasSwapped) {
       // Smooth swap animation: glow up → fly → bounce land → glow down
@@ -190,20 +191,25 @@ export const PlanetView: React.FC<Props> = ({
   const gradY2 = 50 - Math.sin(angleToCenter) * 50;
 
   return (
-    <Animated.View style={[styles.planetContainer, animatedStyle]}>
+    <Animated.View style={[styles.planetContainer, animatedStyle, { width: pSize, height: pSize }]}>
       <Animated.View
         style={[
           styles.glow,
-          { backgroundColor: config.color, shadowColor: config.color },
+          {
+            backgroundColor: config.color,
+            shadowColor: config.color,
+            width: pSize + 16,
+            height: pSize + 16,
+            borderRadius: (pSize + 16) / 2,
+          },
           glowStyle,
         ]}
       />
       <Animated.View style={spinStyle}>
-        <Image source={sprite} style={styles.planetImage} resizeMode="cover" />
+        <Image source={sprite} style={{ width: pSize, height: pSize, borderRadius: pSize / 2 }} resizeMode="cover" />
       </Animated.View>
-      {/* Lighting overlay — sunlit side bright, shadow side dark */}
-      <View style={styles.lightingOverlay} pointerEvents="none">
-        <Svg width={PLANET_SIZE} height={PLANET_SIZE}>
+      <View style={[styles.lightingOverlay, { width: pSize, height: pSize }]} pointerEvents="none">
+        <Svg width={pSize} height={pSize}>
           <Defs>
             <LinearGradient
               id={`light-${planet.id}`}
@@ -215,12 +221,7 @@ export const PlanetView: React.FC<Props> = ({
               <Stop offset="100%" stopColor="#000000" stopOpacity="0.4" />
             </LinearGradient>
           </Defs>
-          <Circle
-            cx={PLANET_SIZE / 2}
-            cy={PLANET_SIZE / 2}
-            r={PLANET_SIZE / 2 - 1}
-            fill={`url(#light-${planet.id})`}
-          />
+          <Circle cx={pSize / 2} cy={pSize / 2} r={pSize / 2 - 1} fill={`url(#light-${planet.id})`} />
         </Svg>
       </View>
     </Animated.View>
