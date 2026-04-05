@@ -55,7 +55,6 @@ export interface PowerUpState {
   remainingTime?: number;
 }
 
-// Swipe collects adjacent same-type planets on one orbit
 export interface SwipeState {
   active: boolean;
   orbitIndex: number;
@@ -65,26 +64,48 @@ export interface SwipeState {
 
 export interface GameState {
   planets: Planet[];
-  score: number;
+  rescued: number;       // planets saved by swiping
+  rescueTarget: number;  // how many to save to win
   swapsLeft: number;
   selectedPlanetId: string | null;
-  phase: 'title' | 'playing' | 'gameover';
+  phase: 'title' | 'playing' | 'won' | 'gameover';
   powerUps: PowerUpState[];
   combo: number;
-  bestScore: number;
+  bestRescued: number;
+  timeLeft: number;       // seconds remaining
+  totalTime: number;      // total level time in seconds
 }
 
-// Adjacent match on one orbit
-export interface OrbitMatch {
-  orbitIndex: number;
-  planets: Planet[];
-  type: PlanetType;
+// Star phase based on time remaining (0-1 ratio)
+export interface StarPhase {
+  color: string;
+  glowColor: string;
+  scale: number;
+  label: string;
+}
+
+export const STAR_PHASES: StarPhase[] = [
+  { color: '#ffffff', glowColor: '#ffd700', scale: 1.0, label: 'Stable' },       // >80%
+  { color: '#fff4cc', glowColor: '#ffaa00', scale: 0.95, label: 'Warming' },     // 60-80%
+  { color: '#ffaa44', glowColor: '#ff6600', scale: 0.90, label: 'Unstable' },    // 40-60%
+  { color: '#ff6633', glowColor: '#ff2200', scale: 0.85, label: 'Critical' },    // 20-40%
+  { color: '#cc2200', glowColor: '#880000', scale: 0.80, label: 'Collapsing' },  // <20%
+];
+
+export function getStarPhase(timeRatio: number): StarPhase {
+  if (timeRatio > 0.8) return STAR_PHASES[0];
+  if (timeRatio > 0.6) return STAR_PHASES[1];
+  if (timeRatio > 0.4) return STAR_PHASES[2];
+  if (timeRatio > 0.2) return STAR_PHASES[3];
+  return STAR_PHASES[4];
 }
 
 export const STAR_SIZE = 50;
 export const PLANET_SIZE = 42;
 export const PLANET_HITBOX = 36;
-export const INITIAL_SWAPS = 7;
-export const SWAP_PROXIMITY = 13; // degrees — max angle diff for cross-orbit swap
-export const SWAP_WARN_PROXIMITY = 25; // degrees — start showing proximity indicator
+export const INITIAL_SWAPS = 5;
+export const LEVEL_TIME = 120;    // 2 minutes
+export const RESCUE_TARGET = 15;  // planets to save
+export const SWAP_PROXIMITY = 13;
+export const SWAP_WARN_PROXIMITY = 25;
 export const ROTATION_SLOWDOWN = 0.3;

@@ -41,7 +41,8 @@ function GameScreen() {
     }
   }, [showTitle]);
 
-  const progressWidth = (state.swapsLeft / 7) * 100;
+  const progressWidth = (state.timeLeft / state.totalTime) * 100;
+  const timeRatio = state.timeLeft / state.totalTime;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -61,24 +62,29 @@ function GameScreen() {
       )}
 
       {/* Game UI */}
-      {state.phase === 'playing' && !showTitle && (
+      {(state.phase === 'playing' || state.phase === 'won') && !showTitle && (
         <Animated.View entering={FadeIn.delay(200).duration(500)} style={styles.gameContainer}>
-          {/* Top: Score + Combo + Moves */}
+          {/* Top: Rescued + Timer + Swaps */}
           <View style={styles.topBar}>
             <View style={styles.scoreContainer}>
-              <Text style={styles.scoreLabel}>SCORE</Text>
-              <Text style={styles.scoreValue}>{state.score.toLocaleString()}</Text>
+              <Text style={styles.scoreLabel}>RESCUED</Text>
+              <Text style={styles.scoreValue}>{state.rescued}/{state.rescueTarget}</Text>
             </View>
-            {state.combo >= 2 && (
-              <View style={styles.comboContainer}>
-                <Text style={styles.comboValue}>x{
-                  state.combo >= 5 ? '3.0' :
+            <View style={styles.comboContainer}>
+              <Text style={[
+                styles.timerValue,
+                state.timeLeft <= 30 && styles.movesLow,
+              ]}>
+                {Math.ceil(state.timeLeft)}s
+              </Text>
+              {state.combo >= 2 && (
+                <Text style={styles.comboLabel}>COMBO x{
+                  state.combo >= 5 ? '3' :
                   state.combo >= 4 ? '2.5' :
-                  state.combo >= 3 ? '2.0' : '1.5'
+                  state.combo >= 3 ? '2' : '1.5'
                 }</Text>
-                <Text style={styles.comboLabel}>COMBO</Text>
-              </View>
-            )}
+              )}
+            </View>
             <View style={styles.movesContainer}>
               <Text style={styles.movesLabel}>SWAPS</Text>
               <Text style={[styles.movesValue, state.swapsLeft <= 2 && styles.movesLow]}>
@@ -102,7 +108,10 @@ function GameScreen() {
               <View
                 style={[
                   styles.progressBar,
-                  { width: `${Math.max(0, Math.min(100, progressWidth))}%` },
+                  {
+                    width: `${Math.max(0, Math.min(100, progressWidth))}%`,
+                    backgroundColor: timeRatio > 0.5 ? '#ffd700' : timeRatio > 0.25 ? '#ff6600' : '#cc2200',
+                  },
                 ]}
               />
             </View>
@@ -110,21 +119,40 @@ function GameScreen() {
         </Animated.View>
       )}
 
-      {/* Game Over Screen */}
-      {state.phase === 'gameover' && (
+      {/* Won Screen */}
+      {state.phase === 'won' && (
         <Animated.View
           entering={FadeIn.duration(500)}
           style={styles.gameOverContainer}
         >
           <View style={styles.gameOverCard}>
-            <Text style={styles.gameOverTitle}>GAME OVER</Text>
-            <Text style={styles.finalScore}>{state.score.toLocaleString()}</Text>
-            <Text style={styles.finalScoreLabel}>FINAL SCORE</Text>
-            {state.score >= state.bestScore && state.score > 0 && (
-              <Text style={styles.newBest}>NEW BEST!</Text>
-            )}
-            {state.bestScore > 0 && state.score < state.bestScore && (
-              <Text style={styles.bestScore}>Best: {state.bestScore.toLocaleString()}</Text>
+            <Text style={styles.wonTitle}>SYSTEM SAVED!</Text>
+            <Text style={styles.finalScore}>{state.rescued}</Text>
+            <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
+            <Text style={styles.newBest}>Star stabilized!</Text>
+            <TouchableOpacity
+              style={styles.playAgainButton}
+              onPress={() => { setShowTitle(false); startGame(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.playAgainText}>NEXT SYSTEM</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Game Over Screen — Supernova */}
+      {state.phase === 'gameover' && (
+        <Animated.View
+          entering={FadeIn.duration(500)}
+          style={[styles.gameOverContainer, { backgroundColor: 'rgba(80, 10, 0, 0.85)' }]}
+        >
+          <View style={styles.gameOverCard}>
+            <Text style={styles.gameOverTitle}>SUPERNOVA</Text>
+            <Text style={styles.finalScore}>{state.rescued}/{state.rescueTarget}</Text>
+            <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
+            {state.rescued > 0 && (
+              <Text style={styles.bestScore}>So close! {state.rescueTarget - state.rescued} more needed</Text>
             )}
             <TouchableOpacity
               style={styles.playAgainButton}
@@ -209,6 +237,11 @@ const styles = StyleSheet.create({
   comboContainer: {
     alignItems: 'center',
   },
+  timerValue: {
+    color: '#f5e6c8',
+    fontSize: 28,
+    fontWeight: '900',
+  },
   comboValue: {
     color: '#ffd700',
     fontSize: 28,
@@ -272,6 +305,16 @@ const styles = StyleSheet.create({
   gameOverCard: {
     alignItems: 'center',
     padding: 40,
+  },
+  wonTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#2ecc71',
+    letterSpacing: 4,
+    marginBottom: 20,
+    textShadowColor: '#27ae60',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
   },
   gameOverTitle: {
     fontSize: 36,
