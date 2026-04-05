@@ -176,23 +176,42 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
             );
             const color = PLANET_CONFIGS[triple.type].color;
             const tight = triple.avgAngleDiff < 5;
+            // Pulse effect: oscillate opacity using rotation angle as proxy for time
+            const pulse = Math.abs(Math.sin(rotationAngles[0] * 0.15));
+            const glowOpacity = tight ? 0.3 + pulse * 0.4 : 0.1 + pulse * 0.15;
+            const mainOpacity = tight ? 0.7 + pulse * 0.3 : 0.25 + pulse * 0.15;
+            const mainWidth = tight ? 3 : 1.5;
+            const glowWidth = tight ? 10 : 5;
             return (
               <React.Fragment key={`align-${i}`}>
+                {/* Glow layer */}
+                <Line
+                  x1={positions[0].x} y1={positions[0].y}
+                  x2={positions[2].x} y2={positions[2].y}
+                  stroke={color}
+                  strokeWidth={glowWidth}
+                  strokeOpacity={glowOpacity}
+                  strokeLinecap="round"
+                />
+                {/* Main line: inner to middle */}
                 <Line
                   x1={positions[0].x} y1={positions[0].y}
                   x2={positions[1].x} y2={positions[1].y}
                   stroke={color}
-                  strokeWidth={tight ? 2.5 : 1}
-                  strokeOpacity={tight ? 0.8 : 0.3}
-                  strokeDasharray={tight ? undefined : '4,4'}
+                  strokeWidth={mainWidth}
+                  strokeOpacity={mainOpacity}
+                  strokeDasharray={tight ? undefined : '6,4'}
+                  strokeLinecap="round"
                 />
+                {/* Main line: middle to outer */}
                 <Line
                   x1={positions[1].x} y1={positions[1].y}
                   x2={positions[2].x} y2={positions[2].y}
                   stroke={color}
-                  strokeWidth={tight ? 2.5 : 1}
-                  strokeOpacity={tight ? 0.8 : 0.3}
-                  strokeDasharray={tight ? undefined : '4,4'}
+                  strokeWidth={mainWidth}
+                  strokeOpacity={mainOpacity}
+                  strokeDasharray={tight ? undefined : '6,4'}
+                  strokeLinecap="round"
                 />
               </React.Fragment>
             );
