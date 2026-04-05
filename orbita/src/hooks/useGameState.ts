@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Sounds } from '../engine/sounds';
+import { Sounds, startMusic, stopMusic, setMusicUrgency } from '../engine/sounds';
 import {
   GameState,
   Planet,
@@ -101,8 +101,11 @@ export function useGameState(): UseGameStateReturn {
     if (stateRef.current.phase !== 'playing' || isPaused) return;
     setState((prev) => {
       const newTime = Math.max(0, prev.timeLeft - dt);
+      // Update music urgency
+      setMusicUrgency(newTime / prev.totalTime);
       if (newTime <= 0) {
         // Star explodes — game over
+        stopMusic();
         Sounds.gameOver();
         return {
           ...prev,
@@ -120,6 +123,7 @@ export function useGameState(): UseGameStateReturn {
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
     freezeActiveRef.current = false;
     Sounds.gameStart();
+    startMusic();
     setState({
       planets,
       rescued: 0,
@@ -216,6 +220,7 @@ export function useGameState(): UseGameStateReturn {
 
           // Check win condition
           if (newRescued >= prev.rescueTarget) {
+            stopMusic();
             Sounds.gameStart(); // victory sound
             return {
               ...prev,
