@@ -345,6 +345,10 @@ const styles = StyleSheet.create({
   bottomPanel: {
     paddingHorizontal: 16,
     paddingBottom: 8,
+    paddingTop: 12,
+    backgroundColor: 'rgba(8, 10, 30, 0.85)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
   progressBarContainer: {
     height: 4,
