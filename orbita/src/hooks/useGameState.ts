@@ -169,16 +169,11 @@ export function useGameState(): UseGameStateReturn {
       setTimeout(() => {
         setState((prev) => {
           const remaining = prev.planets.filter((p) => !matchIds.has(p.id));
-          const filled = fillEmptySlots(remaining);
-          const filledIds = new Set(
-            filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
-          );
-          setNewPlanetIds(filledIds);
           setRemovingPlanetIds(new Set());
 
           return {
             ...prev,
-            planets: filled,
+            planets: remaining,
             score: prev.score + points,
             combo: newCombo,
           };
