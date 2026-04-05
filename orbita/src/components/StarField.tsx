@@ -58,8 +58,8 @@ export const StarField: React.FC = () => {
     return Array.from({ length: STAR_COUNT }, () => ({
       x: Math.random() * SCREEN_W,
       y: Math.random() * SCREEN_H,
-      size: Math.random() * 2 + 0.5,
-      twinkle: Math.random() > 0.5,
+      size: Math.random() * 3 + 1.5,
+      twinkle: Math.random() > 0.3,
       delay: Math.random() * 3000,
     }));
   }, []);

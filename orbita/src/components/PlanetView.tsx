@@ -55,6 +55,20 @@ export const PlanetView: React.FC<Props> = ({
   const scaleVal = useSharedValue(isNew ? 0 : 1);
   const opacityVal = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
+  // Each planet spins at its own speed based on id
+  const spinRotation = useSharedValue(0);
+
+  useEffect(() => {
+    // Unique spin speed per planet: 8-15 seconds per rotation
+    const idNum = parseInt(planet.id.replace('p', ''), 10) || 1;
+    const duration = 8000 + (idNum % 7) * 1000;
+    const direction = idNum % 2 === 0 ? 360 : -360;
+    spinRotation.value = withRepeat(
+      withTiming(direction, { duration, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, [planet.id]);
 
   // Track previous orbit+slot to detect swaps
   const prevOrbitRef = useRef(planet.orbitIndex);
@@ -159,6 +173,10 @@ export const PlanetView: React.FC<Props> = ({
     opacity: glowOpacity.value,
   }));
 
+  const spinStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${spinRotation.value}deg` }],
+  }));
+
   const sprite = PLANET_SPRITES[config.sprite];
 
   return (
@@ -170,7 +188,9 @@ export const PlanetView: React.FC<Props> = ({
           glowStyle,
         ]}
       />
-      <Image source={sprite} style={styles.planetImage} resizeMode="cover" />
+      <Animated.View style={spinStyle}>
+        <Image source={sprite} style={styles.planetImage} resizeMode="cover" />
+      </Animated.View>
     </Animated.View>
   );
 };
