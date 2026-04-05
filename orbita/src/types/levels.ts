@@ -23,7 +23,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
     slots: [3, 4, 5],   // 12 planets
-    speedMultiplier: 0.5,
+    speedMultiplier: 0.8,
     alignmentTolerance: 25,
     powerUps: [],
     newMechanic: 'Swipe through 3 same-color planets when they align!',
@@ -36,7 +36,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
     slots: [4, 5, 6],   // 15 planets
-    speedMultiplier: 0.7,
+    speedMultiplier: 0.9,
     alignmentTolerance: 22,
     powerUps: [{ type: PowerUpType.STAR_FREEZE, uses: 1 }],
     newMechanic: 'FREEZE stops all orbits for 8 seconds!',
