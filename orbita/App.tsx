@@ -65,11 +65,13 @@ function GameScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <Animated.Image
-        source={require('./src/../assets/space-bg.png')}
-        style={[styles.bgImage, bgAnimStyle]}
-        resizeMode="cover"
-      />
+      <View style={styles.bgWrapper} pointerEvents="none">
+        <Animated.Image
+          source={require('./src/../assets/space-bg.png')}
+          style={[styles.bgImage, bgAnimStyle]}
+          resizeMode="cover"
+        />
+      </View>
       <StatusBar barStyle="light-content" backgroundColor="#0a0e27" />
       <StarField />
 
@@ -228,13 +230,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0e27',
   },
-  bgImage: {
+  bgWrapper: {
     position: 'absolute',
-    // Make image large enough to cover screen diagonal during rotation
-    width: Math.max(SCREEN_W, SCREEN_H) * 1.5,
-    height: Math.max(SCREEN_W, SCREEN_H) * 1.5,
-    left: -(Math.max(SCREEN_W, SCREEN_H) * 1.5 - SCREEN_W) / 2,
-    top: -(Math.max(SCREEN_W, SCREEN_H) * 1.5 - SCREEN_H) / 2,
+    width: SCREEN_W,
+    height: SCREEN_H,
+    overflow: 'visible',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bgImage: {
+    width: Math.hypot(SCREEN_W, SCREEN_H),
+    height: Math.hypot(SCREEN_W, SCREEN_H),
   },
   titleContainer: {
     ...StyleSheet.absoluteFillObject,
