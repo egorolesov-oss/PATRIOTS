@@ -179,11 +179,8 @@ export async function stopMusic() {
 export async function setMusicUrgency(timeRatio: number) {
   if (!musicSound || !musicPlaying) return;
   try {
-    // Volume increases as star dies: 0.15 → 0.35
-    const vol = 0.15 + (1 - timeRatio) * 0.2;
+    // Only adjust volume, no rate change (causes stuttering)
+    const vol = 0.15 + (1 - timeRatio) * 0.15;
     await musicSound.setVolumeAsync(vol);
-    // Speed up slightly as star dies: 1.0 → 1.15
-    const rate = 1.0 + (1 - timeRatio) * 0.15;
-    await musicSound.setRateAsync(rate, false);
   } catch {}
 }

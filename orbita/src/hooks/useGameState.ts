@@ -103,7 +103,7 @@ export function useGameState(): UseGameStateReturn {
 
     // Update music urgency every ~1 second (not every frame)
     musicTickRef.current += dt;
-    if (musicTickRef.current > 1) {
+    if (musicTickRef.current > 5) {
       musicTickRef.current = 0;
       const ratio = stateRef.current.timeLeft / stateRef.current.totalTime;
       setMusicUrgency(ratio);
