@@ -36,7 +36,9 @@ function GameScreen() {
 
   const [showTitle, setShowTitle] = useState(true);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(true); // show on first play
+  const [showLevelIntro, setShowLevelIntro] = useState(false);
+  const [pendingLevelId, setPendingLevelId] = useState(1);
+  const [showTutorial, setShowTutorial] = useState(true);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Very slow background rotation
@@ -67,7 +69,13 @@ function GameScreen() {
 
   const handleSelectLevel = useCallback((levelId: number) => {
     setShowLevelSelect(false);
-    startLevel(levelId);
+    setPendingLevelId(levelId);
+    setShowLevelIntro(true);
+    // After 2.5s, start the level
+    setTimeout(() => {
+      setShowLevelIntro(false);
+      startLevel(levelId);
+    }, 2500);
   }, [startLevel]);
 
   const progressWidth = (state.timeLeft / state.totalTime) * 100;
@@ -139,6 +147,34 @@ function GameScreen() {
               );
             })}
           </View>
+        </Animated.View>
+      )}
+
+      {/* Level Intro */}
+      {showLevelIntro && (
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          exiting={FadeOut.duration(400)}
+          style={styles.levelIntroContainer}
+        >
+          <Animated.Text
+            entering={FadeIn.delay(200).duration(500)}
+            style={styles.levelIntroNumber}
+          >
+            LEVEL {pendingLevelId}
+          </Animated.Text>
+          <Animated.Text
+            entering={FadeIn.delay(600).duration(500)}
+            style={styles.levelIntroName}
+          >
+            {LEVELS.find((l) => l.id === pendingLevelId)?.name || ''}
+          </Animated.Text>
+          <Animated.Text
+            entering={FadeIn.delay(1000).duration(500)}
+            style={styles.levelIntroTarget}
+          >
+            Rescue {LEVELS.find((l) => l.id === pendingLevelId)?.rescueTarget || 0} planets
+          </Animated.Text>
         </Animated.View>
       )}
 
@@ -242,6 +278,21 @@ function GameScreen() {
             <Text style={styles.wonTitle}>SYSTEM SAVED!</Text>
             <Text style={styles.finalScore}>{state.rescued}</Text>
             <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
+            {/* Animated star rating */}
+            <View style={styles.starRatingRow}>
+              {[1, 2, 3].map((starNum) => {
+                const earned = (levelStars[currentLevel.id - 1] || 0) >= starNum;
+                return (
+                  <Animated.Text
+                    key={starNum}
+                    entering={FadeIn.delay(starNum * 400).duration(400)}
+                    style={[styles.starRatingIcon, !earned && styles.starRatingEmpty]}
+                  >
+                    {earned ? '★' : '☆'}
+                  </Animated.Text>
+                );
+              })}
+            </View>
             <Text style={styles.levelNameResult}>Level {currentLevel.id}: {currentLevel.name}</Text>
             {currentLevel.id < LEVELS.length ? (
               <TouchableOpacity
@@ -520,6 +571,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 3,
+  },
+  levelIntroContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 95,
+    backgroundColor: 'rgba(6, 8, 24, 0.9)',
+  },
+  levelIntroNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'rgba(245, 230, 200, 0.5)',
+    letterSpacing: 6,
+  },
+  levelIntroName: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#ffd700',
+    letterSpacing: 3,
+    marginTop: 8,
+    textShadowColor: '#ff8800',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 15,
+  },
+  levelIntroTarget: {
+    fontSize: 16,
+    color: 'rgba(245, 230, 200, 0.6)',
+    marginTop: 16,
+    letterSpacing: 2,
+  },
+  starRatingRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+    gap: 8,
+  },
+  starRatingIcon: {
+    fontSize: 40,
+    color: '#ffd700',
+    textShadowColor: '#ff8800',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  starRatingEmpty: {
+    color: 'rgba(255, 255, 255, 0.2)',
+    textShadowRadius: 0,
   },
   urgencyOverlay: {
     ...StyleSheet.absoluteFillObject,
