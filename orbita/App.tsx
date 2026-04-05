@@ -23,6 +23,7 @@ import { StarField } from './src/components/StarField';
 import { GameBoard } from './src/components/GameBoard';
 import { PowerUpPanel } from './src/components/PowerUpPanel';
 import { SupernovaExplosion } from './src/components/SupernovaExplosion';
+import { Tutorial } from './src/components/Tutorial';
 import { useGameState } from './src/hooks/useGameState';
 import { LEVELS } from './src/types/levels';
 
@@ -35,6 +36,8 @@ function GameScreen() {
 
   const [showTitle, setShowTitle] = useState(true);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(true); // show on first play
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
 
   // Very slow background rotation
   const bgRotation = useSharedValue(0);
@@ -176,6 +179,11 @@ function GameScreen() {
             <GameBoard game={game} boardSize={boardSize} />
           </View>
 
+          {/* Red vignette when time is running out */}
+          {state.phase === 'playing' && timeRatio < 0.25 && (
+            <View style={[styles.urgencyOverlay, { opacity: (1 - timeRatio * 4) * 0.3 }]} pointerEvents="none" />
+          )}
+
           {/* Bottom: Power-ups + Progress with gradient fade */}
           <View style={styles.bottomGradient} pointerEvents="none">
             {[0, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 1].map((opacity, i) => (
@@ -206,6 +214,14 @@ function GameScreen() {
             </View>
           </View>
         </Animated.View>
+      )}
+
+      {/* Tutorial overlay on Level 1 */}
+      {state.phase === 'playing' && currentLevel.id === 1 && !tutorialCompleted && showTutorial && (
+        <Tutorial onComplete={() => {
+          setShowTutorial(false);
+          setTutorialCompleted(true);
+        }} />
       )}
 
       {/* Supernova Explosion Animation */}
@@ -504,6 +520,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 3,
+  },
+  urgencyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 8,
+    borderColor: '#ff0000',
+    borderRadius: 0,
+    backgroundColor: 'rgba(255, 0, 0, 0.05)',
   },
   levelSelectContainer: {
     ...StyleSheet.absoluteFillObject,
