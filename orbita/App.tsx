@@ -86,6 +86,8 @@ function GameScreen() {
           </Animated.View>
         )}
       </View>
+      {/* Permanent dark block at bottom of screen */}
+      <View style={styles.bottomEdgeGlobal} pointerEvents="none" />
       <StatusBar barStyle="light-content" backgroundColor="#0a0e27" />
 
       {/* Title Screen */}
@@ -156,8 +158,6 @@ function GameScreen() {
               />
             ))}
           </View>
-          {/* Absolute dark block covering everything below bottom panel to screen edge */}
-          <View style={[styles.bottomEdge, { height: insets.bottom + 50 }]} pointerEvents="none" />
           <View style={[styles.bottomPanel, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
             <PowerUpPanel
               powerUps={state.powerUps}
@@ -372,13 +372,13 @@ const styles = StyleSheet.create({
     height: 40,
     flexDirection: 'column',
   },
-  bottomEdge: {
+  bottomEdgeGlobal: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: -50,
+    left: -20,
+    right: -20,
+    height: 250,
     backgroundColor: '#060818',
-    zIndex: 0,
   },
   bottomPanel: {
     paddingHorizontal: 16,
