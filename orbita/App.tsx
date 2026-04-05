@@ -131,7 +131,18 @@ function GameScreen() {
             <GameBoard game={game} boardSize={boardSize} />
           </View>
 
-          {/* Bottom: Power-ups + Progress */}
+          {/* Bottom: Power-ups + Progress with gradient fade */}
+          <View style={styles.bottomGradient} pointerEvents="none">
+            {[0, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.9, 1].map((opacity, i) => (
+              <View
+                key={i}
+                style={{
+                  flex: 1,
+                  backgroundColor: `rgba(6, 8, 24, ${opacity})`,
+                }}
+              />
+            ))}
+          </View>
           <View style={styles.bottomPanel}>
             <PowerUpPanel
               powerUps={state.powerUps}
@@ -342,13 +353,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  bottomGradient: {
+    height: 40,
+    flexDirection: 'column',
+  },
   bottomPanel: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
-    paddingTop: 12,
-    backgroundColor: 'rgba(8, 10, 30, 0.85)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    paddingBottom: 16,
+    backgroundColor: '#060818',
   },
   progressBarContainer: {
     height: 4,
