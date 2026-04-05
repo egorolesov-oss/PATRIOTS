@@ -113,8 +113,6 @@ export function useGameState(): UseGameStateReturn {
 
   const onSwipeStart = useCallback((planet: Planet) => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
-    // Only start on matchable planets
-    if (!matchableIds.has(planet.id)) return;
 
     setIsSwiping(true);
     setSwipe({
@@ -124,7 +122,7 @@ export function useGameState(): UseGameStateReturn {
       matchType: planet.type,
     });
     setState((prev) => ({ ...prev, selectedPlanetId: null }));
-  }, [matchableIds]);
+  }, []);
 
   const onSwipeThrough = useCallback((planet: Planet) => {
     if (!swipe.active) return;
