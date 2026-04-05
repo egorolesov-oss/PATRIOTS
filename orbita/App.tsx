@@ -45,7 +45,6 @@ function GameScreen() {
   }, []);
   const bgAnimStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale: 1.5 }, // √2 ≈ 1.42, round up for safety
       { rotate: `${bgRotation.value}deg` },
     ],
   }));
@@ -230,9 +229,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#0a0e27',
   },
   bgImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
+    position: 'absolute',
+    // Make image large enough to cover screen diagonal during rotation
+    width: Math.max(SCREEN_W, SCREEN_H) * 1.5,
+    height: Math.max(SCREEN_W, SCREEN_H) * 1.5,
+    left: -(Math.max(SCREEN_W, SCREEN_H) * 1.5 - SCREEN_W) / 2,
+    top: -(Math.max(SCREEN_W, SCREEN_H) * 1.5 - SCREEN_H) / 2,
   },
   titleContainer: {
     ...StyleSheet.absoluteFillObject,
