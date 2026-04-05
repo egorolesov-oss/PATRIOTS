@@ -242,3 +242,88 @@ export function fillEmptySlots(planets: Planet[]): Planet[] {
 
   return newPlanets;
 }
+
+/**
+ * Fill empty slots with bias: if orbit already has 2 of a type,
+ * 40% chance to spawn that type (helps create triples).
+ */
+export function biasedFillEmptySlots(planets: Planet[]): Planet[] {
+  const occupied = new Set(
+    planets.map((p) => `${p.orbitIndex}-${p.slotIndex}`)
+  );
+  const newPlanets: Planet[] = [...planets];
+
+  // Count types per orbit
+  const orbitTypeCounts: Record<number, Record<string, number>> = {};
+  for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
+    orbitTypeCounts[oi] = {};
+    for (const p of planets) {
+      if (p.orbitIndex === oi) {
+        orbitTypeCounts[oi][p.type] = (orbitTypeCounts[oi][p.type] || 0) + 1;
+      }
+    }
+  }
+
+  // Find types that exist on 2 orbits but not 3 (potential triples)
+  const neededTypes: PlanetType[] = [];
+  for (const type of PLANET_TYPES) {
+    let orbitsWithType = 0;
+    for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
+      if ((orbitTypeCounts[oi][type] || 0) > 0) orbitsWithType++;
+    }
+    if (orbitsWithType === 2) neededTypes.push(type);
+  }
+
+  for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
+    const config = ORBIT_CONFIGS[oi];
+    for (let si = 0; si < config.slotCount; si++) {
+      const key = `${oi}-${si}`;
+      if (!occupied.has(key)) {
+        let type: PlanetType;
+        // Bias: if this orbit is missing a "needed" type, 40% chance to spawn it
+        const missingNeeded = neededTypes.filter(
+          (t) => (orbitTypeCounts[oi][t] || 0) === 0
+        );
+        if (missingNeeded.length > 0 && Math.random() < 0.4) {
+          type = missingNeeded[Math.floor(Math.random() * missingNeeded.length)];
+        } else {
+          type = randomPlanetType();
+        }
+
+        newPlanets.push({
+          id: generateId(),
+          type,
+          orbitIndex: oi,
+          slotIndex: si,
+        });
+        orbitTypeCounts[oi][type] = (orbitTypeCounts[oi][type] || 0) + 1;
+      }
+    }
+  }
+
+  return newPlanets;
+}
+
+/**
+ * Shuffle planet types across all occupied slots.
+ */
+export function shufflePlanets(planets: Planet[]): Planet[] {
+  const types = planets.map((p) => p.type);
+  for (let i = types.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [types[i], types[j]] = [types[j], types[i]];
+  }
+  return planets.map((p, i) => ({ ...p, type: types[i] }));
+}
+
+/**
+ * Check if any valid triples exist (same type on all 3 orbits within tolerance).
+ */
+export function hasValidTriples(
+  planets: Planet[],
+  rotationAngles: number[],
+  tolerance: number = 28
+): boolean {
+  const result = findAlignedGroups(planets, rotationAngles, tolerance);
+  return result.triples.length > 0;
+}

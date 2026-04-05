@@ -13,9 +13,11 @@ import {
   findAlignedGroups,
   findProximityPairs,
   canSwapPlanets,
-  AlignedTriple,
   isValidSwipe,
   calculateScore,
+  biasedFillEmptySlots,
+  shufflePlanets,
+  AlignedTriple,
   ProximityPair,
 } from '../engine/board';
 
@@ -75,6 +77,7 @@ export function useGameState(): UseGameStateReturn {
   const processingRef = useRef(false);
   const freezeActiveRef = useRef(false);
   const freezeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastMatchTimeRef = useRef<number>(Date.now());
   const stateRef = useRef(state);
   stateRef.current = state;
   const rotationAnglesRef = useRef(rotationAngles);
@@ -87,12 +90,25 @@ export function useGameState(): UseGameStateReturn {
     setAlignedIds(result.ids);
     setAlignedTriples(result.triples);
     setProximityPairs(findProximityPairs(stateRef.current.planets, angles));
+
+    // Game over: no swaps left + 15 seconds without a match
+    if (
+      stateRef.current.swapsLeft <= 0 &&
+      Date.now() - lastMatchTimeRef.current > 15000
+    ) {
+      setState((prev) => ({
+        ...prev,
+        phase: 'gameover',
+        bestScore: Math.max(prev.bestScore, prev.score),
+      }));
+    }
   }, []);
 
   const startGame = useCallback(() => {
     const planets = generateBoard();
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
     freezeActiveRef.current = false;
+    lastMatchTimeRef.current = Date.now();
     setState({
       planets,
       score: 0,
@@ -170,19 +186,28 @@ export function useGameState(): UseGameStateReturn {
       setTimeout(() => {
         setState((prev) => {
           const remaining = prev.planets.filter((p) => !matchIds.has(p.id));
+          // Refill empty slots with biased spawning
+          let filled = biasedFillEmptySlots(remaining);
+          const newIds = new Set(
+            filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
+          );
+          setNewPlanetIds(newIds);
           setRemovingPlanetIds(new Set());
+          // Reset no-match timer
+          lastMatchTimeRef.current = Date.now();
           return {
             ...prev,
-            planets: remaining,
+            planets: filled,
             score: prev.score + points,
             combo: newCombo,
           };
         });
 
         setTimeout(() => {
+          setNewPlanetIds(new Set());
           processingRef.current = false;
           if (!freezeActiveRef.current) setIsPaused(false);
-        }, 400);
+        }, 500);
       }, 500);
     } else {
       setState((prev) => ({ ...prev, combo: 0 }));
