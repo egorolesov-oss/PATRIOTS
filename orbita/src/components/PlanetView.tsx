@@ -104,21 +104,12 @@ export const PlanetView: React.FC<Props> = ({
     }
   }, [isSelected]);
 
-  // Matchable — subtle pulse
+  // Reset glow when not selected/collected
   useEffect(() => {
-    if (isMatchable && !isSelected && !isCollected && !isRemoving) {
-      glowOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.5, { duration: 600 }),
-          withTiming(0.1, { duration: 600 })
-        ),
-        -1,
-        true
-      );
-    } else if (!isSelected && !isCollected && !isRemoving) {
+    if (!isSelected && !isCollected && !isRemoving) {
       glowOpacity.value = withTiming(0, { duration: 200 });
     }
-  }, [isMatchable, isSelected, isCollected, isRemoving]);
+  }, [isSelected, isCollected, isRemoving]);
 
   // Collected by swipe — bright highlight
   useEffect(() => {
