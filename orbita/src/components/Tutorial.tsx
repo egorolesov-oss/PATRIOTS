@@ -368,8 +368,12 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     paddingHorizontal: 24,
-    paddingBottom: 140,
+    paddingBottom: 220,
     alignItems: 'center',
+    backgroundColor: 'rgba(6, 8, 24, 0.75)',
+    paddingTop: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   mainText: {
     fontSize: 22,
@@ -412,7 +416,7 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     position: 'absolute',
-    bottom: 130,
+    bottom: 185,
     alignSelf: 'center',
     paddingHorizontal: 20,
     paddingVertical: 8,

@@ -277,6 +277,7 @@ function GameScreen() {
             <PowerUpPanel
               powerUps={state.powerUps}
               onUsePowerUp={usePowerUp}
+              suppressTooltips={currentLevel.id === 0 && showTutorial}
             />
             <View style={styles.progressBarContainer}>
               <View

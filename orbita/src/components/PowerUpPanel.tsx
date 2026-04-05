@@ -14,6 +14,7 @@ import { PowerUpType, PowerUpState } from '../types/game';
 interface Props {
   powerUps: PowerUpState[];
   onUsePowerUp: (type: PowerUpType) => void;
+  suppressTooltips?: boolean;
 }
 
 const TOOLTIPS: Record<PowerUpType, string> = {
@@ -172,7 +173,7 @@ const PowerUpButton: React.FC<{
   );
 };
 
-export const PowerUpPanel: React.FC<Props> = ({ powerUps, onUsePowerUp }) => {
+export const PowerUpPanel: React.FC<Props> = ({ powerUps, onUsePowerUp, suppressTooltips }) => {
   // Track which power-up types have been used at least once (across all games)
   const [seenTypes, setSeenTypes] = useState<Set<PowerUpType>>(new Set());
   // Show tooltip for power-ups not yet used
@@ -181,7 +182,7 @@ export const PowerUpPanel: React.FC<Props> = ({ powerUps, onUsePowerUp }) => {
   // Show tooltip for first unseen power-up available
   useEffect(() => {
     for (const pu of powerUps) {
-      if (!pu.used && !seenTypes.has(pu.type) && activeTooltip === null) {
+      if (!pu.used && !seenTypes.has(pu.type) && activeTooltip === null && !suppressTooltips) {
         const timer = setTimeout(() => setActiveTooltip(pu.type), 2000);
         return () => clearTimeout(timer);
       }
