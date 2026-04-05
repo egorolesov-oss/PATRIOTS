@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Image } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -56,10 +56,42 @@ export const PlanetView: React.FC<Props> = ({
   const opacityVal = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
 
+  // Track previous orbit+slot to detect swaps
+  const prevOrbitRef = useRef(planet.orbitIndex);
+  const prevSlotRef = useRef(planet.slotIndex);
+
   useEffect(() => {
-    translateX.value = pos.x - PLANET_SIZE / 2;
-    translateY.value = pos.y - PLANET_SIZE / 2;
-  }, [pos.x, pos.y]);
+    const wasSwapped =
+      prevOrbitRef.current !== planet.orbitIndex ||
+      prevSlotRef.current !== planet.slotIndex;
+
+    prevOrbitRef.current = planet.orbitIndex;
+    prevSlotRef.current = planet.slotIndex;
+
+    const targetX = pos.x - PLANET_SIZE / 2;
+    const targetY = pos.y - PLANET_SIZE / 2;
+
+    if (wasSwapped) {
+      // Animate fly-over to new position
+      translateX.value = withTiming(targetX, {
+        duration: 300,
+        easing: Easing.inOut(Easing.ease),
+      });
+      translateY.value = withTiming(targetY, {
+        duration: 300,
+        easing: Easing.inOut(Easing.ease),
+      });
+      // Little scale pop on arrival
+      scaleVal.value = withSequence(
+        withTiming(0.8, { duration: 150 }),
+        withSpring(1, { damping: 10 })
+      );
+    } else {
+      // Normal rotation update — instant
+      translateX.value = targetX;
+      translateY.value = targetY;
+    }
+  }, [pos.x, pos.y, planet.orbitIndex, planet.slotIndex]);
 
   // Selected
   useEffect(() => {
