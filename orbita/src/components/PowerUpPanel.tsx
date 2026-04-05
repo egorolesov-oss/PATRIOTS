@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  FadeIn,
+  FadeOut,
 } from 'react-native-reanimated';
 import Svg, { Polygon, Line, Circle, Path } from 'react-native-svg';
 import { PowerUpType, PowerUpState } from '../types/game';
@@ -14,11 +16,16 @@ interface Props {
   onUsePowerUp: (type: PowerUpType) => void;
 }
 
+const TOOLTIPS: Record<PowerUpType, string> = {
+  [PowerUpType.STAR_FREEZE]: 'Stops all orbits for 8 seconds',
+  [PowerUpType.NOVA_PULSE]: 'Pulls nearest triple into alignment',
+  [PowerUpType.ANTIGRAVITY]: 'Shuffles all planets to new positions',
+};
+
 const PowerUpIcon: React.FC<{ type: PowerUpType; size: number }> = ({ type, size }) => {
   const half = size / 2;
   switch (type) {
     case PowerUpType.STAR_FREEZE: {
-      // Snowflake / freeze icon
       return (
         <Svg width={size} height={size}>
           {[0, 60, 120].map((angle) => {
@@ -47,7 +54,6 @@ const PowerUpIcon: React.FC<{ type: PowerUpType; size: number }> = ({ type, size
       );
     }
     case PowerUpType.NOVA_PULSE: {
-      // Magnet U-shape
       return (
         <Svg width={size} height={size}>
           <Path
@@ -67,7 +73,6 @@ const PowerUpIcon: React.FC<{ type: PowerUpType; size: number }> = ({ type, size
       );
     }
     case PowerUpType.ANTIGRAVITY: {
-      // Shake / swirl arrows
       return (
         <Svg width={size} height={size}>
           <Path
@@ -97,7 +102,9 @@ const PowerUpIcon: React.FC<{ type: PowerUpType; size: number }> = ({ type, size
 const PowerUpButton: React.FC<{
   powerUp: PowerUpState;
   onPress: () => void;
-}> = ({ powerUp, onPress }) => {
+  showTooltip: boolean;
+  onTooltipDismiss: () => void;
+}> = ({ powerUp, onPress, showTooltip, onTooltipDismiss }) => {
   const pulseScale = useSharedValue(1);
 
   useEffect(() => {
@@ -120,39 +127,85 @@ const PowerUpButton: React.FC<{
     [PowerUpType.ANTIGRAVITY]: 'ANTI-G',
   }[powerUp.type];
 
+  const handlePress = () => {
+    if (showTooltip) {
+      onTooltipDismiss();
+    }
+    onPress();
+  };
+
   return (
-    <Animated.View style={animStyle}>
-      <TouchableOpacity
-        style={[
-          styles.button,
-          powerUp.used && styles.buttonUsed,
-          powerUp.active && styles.buttonActive,
-        ]}
-        onPress={onPress}
-        disabled={powerUp.used}
-        activeOpacity={0.7}
-      >
-        <PowerUpIcon type={powerUp.type} size={28} />
-        <Text style={[styles.label, powerUp.used && styles.labelUsed]}>
-          {powerUp.used
-            ? powerUp.active
-              ? `${powerUp.remainingTime}s`
-              : 'USED'
-            : label}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
+    <View style={styles.buttonWrapper}>
+      {/* Tooltip */}
+      {showTooltip && !powerUp.used && (
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(200)}
+          style={styles.tooltip}
+        >
+          <Text style={styles.tooltipText}>{TOOLTIPS[powerUp.type]}</Text>
+          <View style={styles.tooltipArrow} />
+        </Animated.View>
+      )}
+      <Animated.View style={animStyle}>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            powerUp.used && styles.buttonUsed,
+            powerUp.active && styles.buttonActive,
+          ]}
+          onPress={handlePress}
+          disabled={powerUp.used}
+          activeOpacity={0.7}
+        >
+          <PowerUpIcon type={powerUp.type} size={28} />
+          <Text style={[styles.label, powerUp.used && styles.labelUsed]}>
+            {powerUp.used
+              ? powerUp.active
+                ? `${powerUp.remainingTime}s`
+                : 'USED'
+              : label}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 };
 
 export const PowerUpPanel: React.FC<Props> = ({ powerUps, onUsePowerUp }) => {
+  // Track which power-up types have been used at least once (across all games)
+  const [seenTypes, setSeenTypes] = useState<Set<PowerUpType>>(new Set());
+  // Show tooltip for power-ups not yet used
+  const [activeTooltip, setActiveTooltip] = useState<PowerUpType | null>(null);
+
+  // Show tooltip for first unseen power-up available
+  useEffect(() => {
+    for (const pu of powerUps) {
+      if (!pu.used && !seenTypes.has(pu.type) && activeTooltip === null) {
+        const timer = setTimeout(() => setActiveTooltip(pu.type), 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [powerUps, seenTypes, activeTooltip]);
+
+  const handleUse = (type: PowerUpType) => {
+    setSeenTypes((prev) => new Set([...prev, type]));
+    setActiveTooltip(null);
+    onUsePowerUp(type);
+  };
+
   return (
     <View style={styles.container}>
       {powerUps.map((pu) => (
         <PowerUpButton
           key={pu.type}
           powerUp={pu}
-          onPress={() => onUsePowerUp(pu.type)}
+          onPress={() => handleUse(pu.type)}
+          showTooltip={activeTooltip === pu.type}
+          onTooltipDismiss={() => {
+            setSeenTypes((prev) => new Set([...prev, pu.type]));
+            setActiveTooltip(null);
+          }}
         />
       ))}
     </View>
@@ -165,6 +218,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     alignItems: 'center',
     paddingVertical: 8,
+  },
+  buttonWrapper: {
+    alignItems: 'center',
+    position: 'relative',
   },
   button: {
     width: 70,
@@ -194,5 +251,36 @@ const styles = StyleSheet.create({
   },
   labelUsed: {
     color: 'rgba(255,255,255,0.3)',
+  },
+  tooltip: {
+    position: 'absolute',
+    bottom: 78,
+    backgroundColor: 'rgba(20, 25, 50, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+    minWidth: 120,
+    alignItems: 'center',
+    zIndex: 300,
+  },
+  tooltipText: {
+    color: '#f5e6c8',
+    fontSize: 11,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  tooltipArrow: {
+    position: 'absolute',
+    bottom: -6,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'rgba(20, 25, 50, 0.95)',
   },
 });
