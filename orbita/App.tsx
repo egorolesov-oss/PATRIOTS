@@ -74,11 +74,12 @@ function GameScreen() {
     setShowLevelSelect(false);
     setPendingLevelId(levelId);
     setShowLevelIntro(true);
-    setTimeout(() => {
-      setShowLevelIntro(false);
-      startLevel(levelId);
-    }, 2500);
-  }, [startLevel]);
+  }, []);
+
+  const handleStartFromIntro = useCallback(() => {
+    setShowLevelIntro(false);
+    startLevel(pendingLevelId);
+  }, [startLevel, pendingLevelId]);
 
   const progressWidth = (state.timeLeft / state.totalTime) * 100;
   const timeRatio = state.timeLeft / state.totalTime;
@@ -167,11 +168,11 @@ function GameScreen() {
         </Animated.View>
       )}
 
-      {/* Level Intro */}
+      {/* Level Intro — tap to start */}
       {showLevelIntro && (
-        <Animated.View
-          entering={FadeIn.duration(400)}
-          exiting={FadeOut.duration(400)}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={handleStartFromIntro}
           style={styles.levelIntroContainer}
         >
           <Animated.Text
@@ -192,7 +193,13 @@ function GameScreen() {
           >
             Rescue {LEVELS.find((l) => l.id === pendingLevelId)?.rescueTarget || 0} planets
           </Animated.Text>
-        </Animated.View>
+          <Animated.Text
+            entering={FadeIn.delay(1400).duration(500)}
+            style={styles.tapToStartText}
+          >
+            Tap to start
+          </Animated.Text>
+        </TouchableOpacity>
       )}
 
       {/* Game UI */}
@@ -634,6 +641,12 @@ const styles = StyleSheet.create({
     color: 'rgba(245, 230, 200, 0.6)',
     marginTop: 16,
     letterSpacing: 2,
+  },
+  tapToStartText: {
+    fontSize: 14,
+    color: 'rgba(245, 230, 200, 0.35)',
+    marginTop: 32,
+    letterSpacing: 3,
   },
   starRatingRow: {
     flexDirection: 'row',

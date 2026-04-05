@@ -135,7 +135,8 @@ export function useGameState(): UseGameStateReturn {
         }
         // Star explodes — start explosion animation
         stopMusic();
-        Sounds.gameOver();
+        // Delay sound slightly so audio context isn't busy
+        setTimeout(() => Sounds.gameOver(), 100);
         // Transition to gameover after 4 seconds
         setTimeout(() => {
           setState((p) => ({
