@@ -4,7 +4,6 @@ export enum PlanetType {
   BLUE = 'BLUE',
   ORANGE = 'ORANGE',
   PURPLE = 'PURPLE',
-  PINK = 'PINK',
 }
 
 export interface PlanetConfig {
@@ -19,7 +18,6 @@ export const PLANET_CONFIGS: Record<PlanetType, PlanetConfig> = {
   [PlanetType.BLUE]: { type: PlanetType.BLUE, color: '#3498db', symbol: 'diamond' },
   [PlanetType.ORANGE]: { type: PlanetType.ORANGE, color: '#e67e22', symbol: 'circle' },
   [PlanetType.PURPLE]: { type: PlanetType.PURPLE, color: '#9b59b6', symbol: 'pentagon' },
-  [PlanetType.PINK]: { type: PlanetType.PINK, color: '#e91e90', symbol: 'star' },
 };
 
 export interface Planet {
@@ -80,8 +78,8 @@ export interface GameState {
 }
 
 export const STAR_SIZE = 60;
-export const PLANET_SIZE = 44;
+export const PLANET_SIZE = 48;
 export const INITIAL_MOVES = 30;
-export const CONJUNCTION_TOLERANCE = 5; // degrees
+export const CONJUNCTION_TOLERANCE = 12; // degrees (increased from 5 for better gameplay)
 export const MAX_CASCADE_DEPTH = 5;
 export const CRYO_DURATION = 10; // seconds
