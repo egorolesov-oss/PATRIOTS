@@ -65,16 +65,18 @@ export interface SwipeState {
 
 export interface GameState {
   planets: Planet[];
-  rescued: number;       // planets saved by swiping
-  rescueTarget: number;  // how many to save to win
+  rescued: number;
+  rescueTarget: number;
   swapsLeft: number;
   selectedPlanetId: string | null;
   phase: 'title' | 'playing' | 'exploding' | 'won' | 'gameover';
   powerUps: PowerUpState[];
   combo: number;
   bestRescued: number;
-  timeLeft: number;       // seconds remaining
-  totalTime: number;      // total level time in seconds
+  timeLeft: number;
+  totalTime: number;
+  gameMode: 'supernova' | 'architect';
+  architectTargets: { orbitIndex: number; slotIndex: number; type: PlanetType }[];
 }
 
 // Star phase based on time remaining (0-1 ratio)

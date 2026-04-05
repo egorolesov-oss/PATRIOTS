@@ -103,7 +103,7 @@ function GameScreen() {
           speedMultiplier: archLevel.speedMultiplier,
           alignmentTolerance: 25,
           powerUps: [],
-        });
+        }, archLevel.targets);
       }
     } else {
       startLevel(pendingLevelId);
@@ -396,9 +396,17 @@ function GameScreen() {
           style={styles.gameOverContainer}
         >
           <View style={styles.gameOverCard}>
-            <Text style={styles.wonTitle}>SYSTEM SAVED!</Text>
-            <Text style={styles.finalScore}>{state.rescued}</Text>
-            <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
+            <Text style={styles.wonTitle}>
+              {gameMode === 'architect' ? 'PATTERN COMPLETE!' : 'SYSTEM SAVED!'}
+            </Text>
+            {gameMode === 'supernova' ? (
+              <>
+                <Text style={styles.finalScore}>{state.rescued}</Text>
+                <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
+              </>
+            ) : (
+              <Text style={styles.finalScoreLabel}>Constellation built perfectly!</Text>
+            )}
             {/* Animated star rating */}
             <View style={styles.starRatingRow}>
               {[1, 2, 3].map((starNum) => {
@@ -444,11 +452,19 @@ function GameScreen() {
           style={[styles.gameOverContainer, { backgroundColor: 'rgba(80, 10, 0, 0.85)' }]}
         >
           <View style={styles.gameOverCard}>
-            <Text style={styles.gameOverTitle}>SUPERNOVA</Text>
-            <Text style={styles.finalScore}>{state.rescued}/{state.rescueTarget}</Text>
-            <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
-            {state.rescued > 0 && (
-              <Text style={styles.bestScore}>So close! {state.rescueTarget - state.rescued} more needed</Text>
+            <Text style={styles.gameOverTitle}>
+              {gameMode === 'architect' ? 'OUT OF SWAPS' : 'SUPERNOVA'}
+            </Text>
+            {gameMode === 'supernova' ? (
+              <>
+                <Text style={styles.finalScore}>{state.rescued}/{state.rescueTarget}</Text>
+                <Text style={styles.finalScoreLabel}>PLANETS RESCUED</Text>
+                {state.rescued > 0 && (
+                  <Text style={styles.bestScore}>So close! {state.rescueTarget - state.rescued} more needed</Text>
+                )}
+              </>
+            ) : (
+              <Text style={styles.finalScoreLabel}>Pattern incomplete — try again!</Text>
             )}
             <Text style={styles.levelNameResult}>Level {currentLevel.id}: {currentLevel.name}</Text>
             <TouchableOpacity

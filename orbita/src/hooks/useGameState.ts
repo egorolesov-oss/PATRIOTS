@@ -3,6 +3,7 @@ import { Sounds, startMusic, stopMusic, setMusicUrgency } from '../engine/sounds
 import {
   GameState,
   Planet,
+  PlanetType,
   PowerUpType,
   PowerUpState,
   SwipeState,
@@ -43,7 +44,7 @@ export interface UseGameStateReturn {
   currentLevel: LevelConfig;
   levelStars: number[];
   maxUnlockedLevel: number;
-  startLevel: (levelId: number, customLevel?: LevelConfig) => void;
+  startLevel: (levelId: number, customLevel?: LevelConfig, targets?: { orbitIndex: number; slotIndex: number; type: PlanetType }[]) => void;
   startGame: () => void;
   selectPlanet: (planet: Planet) => void;
   onSwipeStart: (planet: Planet) => void;
@@ -72,6 +73,8 @@ export function useGameState(): UseGameStateReturn {
     bestRescued: 0,
     timeLeft: currentLevel.time,
     totalTime: currentLevel.time,
+    gameMode: 'supernova',
+    architectTargets: [],
   });
 
   const [rotationAngles, setRotationAngles] = useState([0, 0, 0]);
@@ -110,6 +113,8 @@ export function useGameState(): UseGameStateReturn {
   const musicTickRef = useRef(0);
   const tickTimer = useCallback((dt: number) => {
     if (stateRef.current.phase !== 'playing' || isPaused) return;
+    // No timer in architect mode
+    if (stateRef.current.gameMode === 'architect') return;
 
     // Update music urgency every ~1 second (not every frame)
     musicTickRef.current += dt;
@@ -152,8 +157,9 @@ export function useGameState(): UseGameStateReturn {
     }
   }, [isPaused]);
 
-  const startLevel = useCallback((levelId: number, customLevel?: LevelConfig) => {
+  const startLevel = useCallback((levelId: number, customLevel?: LevelConfig, targets?: { orbitIndex: number; slotIndex: number; type: PlanetType }[]) => {
     const level = customLevel || LEVELS.find((l) => l.id === levelId) || LEVELS[0];
+    const isArchitect = level.time >= 9999;
     setCurrentLevel(level);
     const planets = generateBoard(level.planetTypes, level.slots);
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
@@ -172,6 +178,8 @@ export function useGameState(): UseGameStateReturn {
       bestRescued: stateRef.current.bestRescued,
       timeLeft: level.time,
       totalTime: level.time,
+      gameMode: isArchitect ? 'architect' : 'supernova',
+      architectTargets: targets || [],
     });
     setAlignedIds(new Set());
     setAlignedTriples([]);
@@ -346,6 +354,8 @@ export function useGameState(): UseGameStateReturn {
 
     // Valid cross-orbit swap!
     Sounds.swap();
+    const newSwaps = stateRef.current.swapsLeft - 1;
+
     setState((prev) => {
       const planets = prev.planets.map((p) => {
         if (p.id === selectedPlanet.id) {
@@ -361,9 +371,40 @@ export function useGameState(): UseGameStateReturn {
         ...prev,
         planets,
         selectedPlanetId: null,
-        swapsLeft: prev.swapsLeft - 1,
+        swapsLeft: newSwaps,
       };
     });
+
+    // Check architect win/lose after swap settles
+    setTimeout(() => {
+      const cur = stateRef.current;
+      if (cur.gameMode !== 'architect' || cur.phase !== 'playing') return;
+
+      // Check if all targets are met
+      const allMet = cur.architectTargets.every((t) =>
+        cur.planets.some((p) =>
+          p.orbitIndex === t.orbitIndex &&
+          p.slotIndex === t.slotIndex &&
+          p.type === t.type
+        )
+      );
+
+      if (allMet && cur.architectTargets.length > 0) {
+        stopMusic();
+        Sounds.gameStart();
+        setState((s) => ({
+          ...s,
+          phase: 'won',
+        }));
+      } else if (cur.swapsLeft <= 0) {
+        stopMusic();
+        Sounds.gameOver();
+        setState((s) => ({
+          ...s,
+          phase: 'gameover',
+        }));
+      }
+    }, 700);
   }, [isSwiping]);
 
   // --- POWER-UPS ---

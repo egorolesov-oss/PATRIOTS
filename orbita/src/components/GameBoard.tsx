@@ -231,6 +231,42 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize, tutorialPaused }) 
 
         <StarCore centerX={centerX} centerY={centerY} timeRatio={state.timeLeft / state.totalTime} />
 
+        {/* Architect mode: target ghost markers */}
+        {state.architectTargets.length > 0 && (
+          <Svg width={boardSize} height={boardSize} style={StyleSheet.absoluteFill} pointerEvents="none">
+            {state.architectTargets.map((target, i) => {
+              const tPos = getSlotPosition(target.orbitIndex, target.slotIndex, centerX, centerY, rotationAngles[target.orbitIndex]);
+              const color = PLANET_CONFIGS[target.type]?.color || '#fff';
+              // Check if this target is already satisfied
+              const satisfied = state.planets.some(
+                (p) => p.orbitIndex === target.orbitIndex && p.slotIndex === target.slotIndex && p.type === target.type
+              );
+              return (
+                <React.Fragment key={`target-${i}`}>
+                  {/* Target ring — dashed if not met, solid if met */}
+                  <SvgCircle
+                    cx={tPos.x} cy={tPos.y}
+                    r={22}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={satisfied ? 3 : 2}
+                    strokeOpacity={satisfied ? 0.9 : 0.4}
+                    strokeDasharray={satisfied ? undefined : '4,4'}
+                  />
+                  {/* Inner glow when satisfied */}
+                  {satisfied && (
+                    <SvgCircle cx={tPos.x} cy={tPos.y} r={18} fill={color} fillOpacity={0.15} />
+                  )}
+                  {/* Small colored dot showing target type */}
+                  {!satisfied && (
+                    <SvgCircle cx={tPos.x} cy={tPos.y} r={4} fill={color} fillOpacity={0.5} />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </Svg>
+        )}
+
         {state.planets.map((planet) => (
           <PlanetView
             key={planet.id}
