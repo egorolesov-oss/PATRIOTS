@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { Sounds } from '../engine/sounds';
 import {
   GameState,
   Planet,
@@ -97,6 +98,7 @@ export function useGameState(): UseGameStateReturn {
     if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
     freezeActiveRef.current = false;
     lastMatchTimeRef.current = Date.now();
+    Sounds.gameStart();
     setState({
       planets,
       score: 0,
@@ -169,6 +171,13 @@ export function useGameState(): UseGameStateReturn {
       const newCombo = stateRef.current.combo + 1;
       const points = calculateScore(collected.length, newCombo);
 
+      // Sound
+      if (newCombo >= 2) {
+        Sounds.comboMatch(newCombo);
+      } else {
+        Sounds.match();
+      }
+
       setRemovingPlanetIds(matchIds);
 
       setTimeout(() => {
@@ -181,6 +190,7 @@ export function useGameState(): UseGameStateReturn {
           );
           setNewPlanetIds(newIds);
           setRemovingPlanetIds(new Set());
+          Sounds.spawn();
           // Reset no-match timer
           lastMatchTimeRef.current = Date.now();
           return {
@@ -214,11 +224,13 @@ export function useGameState(): UseGameStateReturn {
     const currentSelected = stateRef.current.selectedPlanetId;
 
     if (!currentSelected) {
+      Sounds.select();
       setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
       return;
     }
 
     if (currentSelected === planet.id) {
+      Sounds.deselect();
       setState((prev) => ({ ...prev, selectedPlanetId: null }));
       return;
     }
@@ -246,6 +258,11 @@ export function useGameState(): UseGameStateReturn {
     }
 
     // Valid cross-orbit swap!
+    const isLastSwap = stateRef.current.swapsLeft <= 1;
+    Sounds.swap();
+    if (isLastSwap) {
+      setTimeout(() => Sounds.gameOver(), 400);
+    }
     setState((prev) => {
       const planets = prev.planets.map((p) => {
         if (p.id === selectedPlanet.id) {
@@ -286,6 +303,7 @@ export function useGameState(): UseGameStateReturn {
 
     switch (type) {
       case PowerUpType.STAR_FREEZE: {
+        Sounds.powerUp();
         freezeActiveRef.current = true;
         setIsPaused(true);
         setState((prev) => ({
@@ -328,6 +346,7 @@ export function useGameState(): UseGameStateReturn {
         break;
       }
       case PowerUpType.ANTIGRAVITY: {
+        Sounds.shake();
         setState((prev) => {
           const types = prev.planets.map((p) => p.type);
           for (let i = types.length - 1; i > 0; i--) {
