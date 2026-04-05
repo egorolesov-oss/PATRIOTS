@@ -83,7 +83,7 @@ export function useGameState(): UseGameStateReturn {
   const updateIndicators = useCallback(() => {
     if (stateRef.current.phase !== 'playing' || processingRef.current) return;
     const angles = rotationAnglesRef.current;
-    const result = findAlignedGroups(stateRef.current.planets, angles, 15);
+    const result = findAlignedGroups(stateRef.current.planets, angles, 22);
     setAlignedIds(result.ids);
     setAlignedTriples(result.triples);
     setProximityPairs(findProximityPairs(stateRef.current.planets, angles));
