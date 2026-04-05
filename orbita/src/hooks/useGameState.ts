@@ -246,53 +246,51 @@ export function useGameState(): UseGameStateReturn {
       setRemovingPlanetIds(matchIds);
 
       setTimeout(() => {
-        setState((prev) => {
-          const remaining = prev.planets.filter((p) => !matchIds.has(p.id));
-          let filled = biasedFillEmptySlots(remaining);
-          const newIds = new Set(
-            filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
-          );
-          setNewPlanetIds(newIds);
-          setRemovingPlanetIds(new Set());
-          Sounds.spawn();
+        const prev = stateRef.current;
+        const remaining = prev.planets.filter((p) => !matchIds.has(p.id));
+        let filled = biasedFillEmptySlots(remaining);
+        const newIds = new Set(
+          filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
+        );
+        setNewPlanetIds(newIds);
+        setRemovingPlanetIds(new Set());
+        Sounds.spawn();
 
-          const newRescued = prev.rescued + rescueCount;
+        const newRescued = prev.rescued + rescueCount;
 
-          // Check win condition
-          if (newRescued >= prev.rescueTarget) {
-            stopMusic();
-            Sounds.gameStart(); // victory sound
-            // Record stars and unlock next level
-            const swapsUsed = currentLevel.swaps - prev.swapsLeft;
-            const powerUpsUsed = prev.powerUps.filter((p) => p.used).length;
-            const stars = prev.timeLeft / currentLevel.time > 0.25
-              ? (swapsUsed === 0 && powerUpsUsed <= 1 ? 3 : 2)
-              : 1;
-            setLevelStars((prev) => {
-              const next = [...prev];
-              next[currentLevel.id - 1] = Math.max(next[currentLevel.id - 1], stars);
-              return next;
-            });
-            if (currentLevel.id < LEVELS.length) {
-              setMaxUnlockedLevel((prev) => Math.max(prev, currentLevel.id + 1));
-            }
-            return {
-              ...prev,
-              planets: filled,
-              rescued: newRescued,
-              combo: newCombo,
-              phase: 'won',
-              bestRescued: Math.max(prev.bestRescued, newRescued),
-            };
+        // Check win condition
+        if (newRescued >= prev.rescueTarget) {
+          stopMusic();
+          Sounds.gameStart(); // victory sound
+          const swapsUsed = currentLevel.swaps - prev.swapsLeft;
+          const powerUpsUsed = prev.powerUps.filter((p) => p.used).length;
+          const stars = prev.timeLeft / currentLevel.time > 0.25
+            ? (swapsUsed === 0 && powerUpsUsed <= 1 ? 3 : 2)
+            : 1;
+          setLevelStars((s) => {
+            const next = [...s];
+            next[currentLevel.id - 1] = Math.max(next[currentLevel.id - 1], stars);
+            return next;
+          });
+          if (currentLevel.id < LEVELS.length) {
+            setMaxUnlockedLevel((m) => Math.max(m, currentLevel.id + 1));
           }
-
-          return {
-            ...prev,
+          setState((s) => ({
+            ...s,
             planets: filled,
             rescued: newRescued,
             combo: newCombo,
-          };
-        });
+            phase: 'won',
+            bestRescued: Math.max(s.bestRescued, newRescued),
+          }));
+        } else {
+          setState((s) => ({
+            ...s,
+            planets: filled,
+            rescued: newRescued,
+            combo: newCombo,
+          }));
+        }
 
         setTimeout(() => {
           setNewPlanetIds(new Set());
