@@ -74,42 +74,50 @@ export const PlanetView: React.FC<Props> = ({
     );
   }, [planet.id]);
 
-  // Track previous orbit+slot to detect swaps
+  // Track previous position to detect and animate swaps
   const prevOrbitRef = useRef(planet.orbitIndex);
   const prevSlotRef = useRef(planet.slotIndex);
+  const prevPosRef = useRef({ x: pos.x, y: pos.y });
 
   useEffect(() => {
     const wasSwapped =
       prevOrbitRef.current !== planet.orbitIndex ||
       prevSlotRef.current !== planet.slotIndex;
 
+    const oldPos = prevPosRef.current;
     prevOrbitRef.current = planet.orbitIndex;
     prevSlotRef.current = planet.slotIndex;
+    prevPosRef.current = { x: pos.x, y: pos.y };
 
     const targetX = pos.x - pSize / 2;
     const targetY = pos.y - pSize / 2;
 
     if (wasSwapped) {
-      // Smooth swap animation: glow up → fly → bounce land → glow down
+      // Start from OLD position (where planet was before swap)
+      const startX = oldPos.x - pSize / 2;
+      const startY = oldPos.y - pSize / 2;
+      translateX.value = startX;
+      translateY.value = startY;
+
       // Glow bright during flight
       glowOpacity.value = withSequence(
         withTiming(1, { duration: 100 }),
-        withTiming(1, { duration: 400 }),
+        withTiming(1, { duration: 500 }),
         withTiming(0, { duration: 200 })
       );
-      // Scale: shrink slightly → grow during flight → bounce land
+      // Scale: shrink → fly big → bounce land
       scaleVal.value = withSequence(
-        withTiming(0.7, { duration: 100, easing: Easing.in(Easing.ease) }),
-        withTiming(1.2, { duration: 300, easing: Easing.out(Easing.ease) }),
+        withTiming(0.6, { duration: 100, easing: Easing.in(Easing.ease) }),
+        withTiming(1.3, { duration: 350, easing: Easing.out(Easing.ease) }),
         withSpring(1, { damping: 8, stiffness: 150 })
       );
-      // Fly to new position with smooth easing
+      // Fly from old position to new — smooth arc
       translateX.value = withTiming(targetX, {
-        duration: 500,
+        duration: 600,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       });
       translateY.value = withTiming(targetY, {
-        duration: 500,
+        duration: 600,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       });
     } else {
