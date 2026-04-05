@@ -487,7 +487,8 @@ export function useGameState(): UseGameStateReturn {
       case PowerUpType.ANTIGRAVITY: {
         Sounds.shake();
         processingRef.current = true;
-        // Phase 1: planets float outward (antigravity on)
+
+        // Phase 1: planets float outward
         setAntigravityActive(true);
         setState((prev) => ({
           ...prev,
@@ -496,25 +497,33 @@ export function useGameState(): UseGameStateReturn {
           ),
         }));
 
-        // Phase 2: after 1.5s, shuffle types and reassemble
+        // Phase 2: after 1.5s, shuffle slot positions within each orbit
         setTimeout(() => {
-          setState((prev) => {
-            const types = prev.planets.map((p) => p.type);
-            for (let i = types.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [types[i], types[j]] = [types[j], types[i]];
-            }
-            return {
-              ...prev,
-              planets: prev.planets.map((p, i) => ({ ...p, type: types[i] })),
-            };
-          });
           setAntigravityActive(false);
-          Sounds.powerUp();
 
+          setState((prev) => {
+            const newPlanets = [...prev.planets];
+            // Shuffle slot indices within each orbit
+            for (let oi = 0; oi < 3; oi++) {
+              const orbitPlanets = newPlanets.filter((p) => p.orbitIndex === oi);
+              const slots = orbitPlanets.map((p) => p.slotIndex);
+              // Fisher-Yates shuffle slots
+              for (let i = slots.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [slots[i], slots[j]] = [slots[j], slots[i]];
+              }
+              orbitPlanets.forEach((p, idx) => {
+                const planetIdx = newPlanets.indexOf(p);
+                newPlanets[planetIdx] = { ...p, slotIndex: slots[idx] };
+              });
+            }
+            return { ...prev, planets: newPlanets };
+          });
+
+          Sounds.powerUp();
           setTimeout(() => {
             processingRef.current = false;
-          }, 600);
+          }, 800);
         }, 1500);
         break;
       }
