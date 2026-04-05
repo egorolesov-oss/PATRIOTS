@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -31,15 +31,12 @@ function GameScreen() {
   const availableHeight = SCREEN_H - insets.top - insets.bottom - 180;
   const boardSize = Math.min(SCREEN_W - 20, availableHeight * 0.7, 500);
 
-  useEffect(() => {
+  const handleTitleTap = useCallback(() => {
     if (showTitle) {
-      const timer = setTimeout(() => {
-        setShowTitle(false);
-        startGame();
-      }, 2000);
-      return () => clearTimeout(timer);
+      setShowTitle(false);
+      startGame();
     }
-  }, [showTitle]);
+  }, [showTitle, startGame]);
 
   const progressWidth = (state.timeLeft / state.totalTime) * 100;
   const timeRatio = state.timeLeft / state.totalTime;
@@ -51,14 +48,21 @@ function GameScreen() {
 
       {/* Title Screen */}
       {showTitle && (
-        <Animated.View
-          entering={FadeIn.duration(800)}
-          exiting={FadeOut.duration(500)}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={handleTitleTap}
           style={styles.titleContainer}
         >
-          <Text style={styles.titleText}>ORBITA</Text>
-          <Text style={styles.subtitleText}>Align the stars</Text>
-        </Animated.View>
+          <Animated.View
+            entering={FadeIn.duration(800)}
+            exiting={FadeOut.duration(500)}
+            style={styles.titleInner}
+          >
+            <Text style={styles.titleText}>ORBITA</Text>
+            <Text style={styles.subtitleText}>Rescue the planets</Text>
+            <Text style={styles.tapText}>Tap to start</Text>
+          </Animated.View>
+        </TouchableOpacity>
       )}
 
       {/* Game UI */}
@@ -194,6 +198,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
+  },
+  titleInner: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tapText: {
+    fontSize: 14,
+    color: 'rgba(245, 230, 200, 0.4)',
+    letterSpacing: 3,
+    marginTop: 24,
   },
   titleText: {
     fontSize: 64,
