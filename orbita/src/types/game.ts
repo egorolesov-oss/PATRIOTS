@@ -41,9 +41,9 @@ export interface OrbitConfig {
 }
 
 export const ORBIT_CONFIGS: OrbitConfig[] = [
-  { radius: 90, slotCount: 6, rotationDirection: 1, rotationDuration: 30 },
-  { radius: 150, slotCount: 8, rotationDirection: -1, rotationDuration: 45 },
-  { radius: 210, slotCount: 10, rotationDirection: 1, rotationDuration: 60 },
+  { radius: 70, slotCount: 6, rotationDirection: 1, rotationDuration: 30 },
+  { radius: 115, slotCount: 8, rotationDirection: -1, rotationDuration: 45 },
+  { radius: 160, slotCount: 10, rotationDirection: 1, rotationDuration: 60 },
 ];
 
 export interface Conjunction {
@@ -89,9 +89,9 @@ export interface AlignmentIndicator {
   angleDiff: number; // how far from perfect alignment (degrees)
 }
 
-export const STAR_SIZE = 60;
-export const STAR_HITZONE = 40; // radius of swipe start zone
-export const PLANET_SIZE = 48;
+export const STAR_SIZE = 50;
+export const STAR_HITZONE = 35; // radius of swipe start zone
+export const PLANET_SIZE = 42;
 export const PLANET_HITBOX = 30; // radius for ray hit detection
 export const SWIPE_TOLERANCE = 8; // degrees tolerance for hitting a planet
 export const INITIAL_MOVES = 25;
