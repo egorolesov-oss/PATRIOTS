@@ -26,13 +26,15 @@ import { SupernovaExplosion } from './src/components/SupernovaExplosion';
 import { Tutorial } from './src/components/Tutorial';
 import { useGameState } from './src/hooks/useGameState';
 import { LEVELS } from './src/types/levels';
+import { getSlotPosition } from './src/engine/board';
+import { PLANET_CONFIGS } from './src/types/game';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 function GameScreen() {
   const insets = useSafeAreaInsets();
   const game = useGameState();
-  const { state, startGame, startLevel, usePowerUp, currentLevel, levelStars, maxUnlockedLevel } = game;
+  const { state, startGame, startLevel, usePowerUp, currentLevel, levelStars, maxUnlockedLevel, alignedTriples, rotationAngles } = game;
 
   const [showTitle, setShowTitle] = useState(true);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
@@ -80,6 +82,21 @@ function GameScreen() {
 
   const progressWidth = (state.timeLeft / state.totalTime) * 100;
   const timeRatio = state.timeLeft / state.totalTime;
+
+  // Compute aligned planet positions for tutorial
+  const boardCenterX = boardSize / 2;
+  const boardCenterY = boardSize / 2;
+  // Approximate board Y offset (top bar ~80px + centering)
+  const boardTopOffset = insets.top + 80;
+
+  const tutorialPlanets = (() => {
+    if (!alignedTriples || alignedTriples.length === 0) return [];
+    const triple = alignedTriples[0];
+    return triple.planets.map((p) => {
+      const pos = getSlotPosition(p.orbitIndex, p.slotIndex, boardCenterX, boardCenterY, rotationAngles[p.orbitIndex]);
+      return { x: pos.x, y: pos.y, color: PLANET_CONFIGS[triple.type]?.color || '#fff' };
+    });
+  })();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -264,6 +281,8 @@ function GameScreen() {
           }}
           setPaused={setTutorialPaused}
           firstMatchDone={state.rescued > 0}
+          alignedPlanets={tutorialPlanets}
+          boardOffsetY={boardTopOffset}
         />
       )}
 

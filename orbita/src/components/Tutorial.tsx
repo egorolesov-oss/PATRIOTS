@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import Svg, { Circle as SvgCircle, Line } from 'react-native-svg';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -12,24 +13,39 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
+const { width: SCREEN_W } = Dimensions.get('window');
+
 type TutorialStep = 'look' | 'swipe_demo' | 'your_turn' | 'done';
+
+interface PlanetPos {
+  x: number;
+  y: number;
+  color: string;
+}
 
 interface Props {
   onComplete: () => void;
   setPaused: (paused: boolean) => void;
   firstMatchDone: boolean;
+  alignedPlanets: PlanetPos[]; // positions of first aligned triple
+  boardOffsetY: number; // board's Y offset from screen top
 }
 
-export const Tutorial: React.FC<Props> = ({ onComplete, setPaused, firstMatchDone }) => {
+export const Tutorial: React.FC<Props> = ({
+  onComplete,
+  setPaused,
+  firstMatchDone,
+  alignedPlanets,
+  boardOffsetY,
+}) => {
   const [step, setStep] = useState<TutorialStep>('look');
 
-  // Hand animation
-  const handY = useSharedValue(0);
+  // Hand position animated between first and last aligned planet
+  const handProgress = useSharedValue(0);
   const handOpacity = useSharedValue(0);
-  // Pulse for "look" step
-  const pulseOpacity = useSharedValue(0.5);
+  const pulseVal = useSharedValue(0.4);
 
-  // Pause orbits during teaching steps
+  // Pause orbits during teaching
   useEffect(() => {
     if (step === 'look' || step === 'swipe_demo') {
       setPaused(true);
@@ -41,11 +57,10 @@ export const Tutorial: React.FC<Props> = ({ onComplete, setPaused, firstMatchDon
   // Step progression
   useEffect(() => {
     if (step === 'look') {
-      // Pulse animation for "watch" step
-      pulseOpacity.value = withRepeat(
+      pulseVal.value = withRepeat(
         withSequence(
-          withTiming(1, { duration: 800 }),
-          withTiming(0.3, { duration: 800 })
+          withTiming(1, { duration: 600 }),
+          withTiming(0.3, { duration: 600 })
         ),
         -1,
         true
@@ -53,55 +68,61 @@ export const Tutorial: React.FC<Props> = ({ onComplete, setPaused, firstMatchDon
       const timer = setTimeout(() => setStep('swipe_demo'), 3500);
       return () => clearTimeout(timer);
     } else if (step === 'swipe_demo') {
-      // Show animated hand swiping downward (from inner orbit to outer)
-      handOpacity.value = withDelay(500, withTiming(1, { duration: 300 }));
-      handY.value = withDelay(800,
+      // Animate hand along the aligned planets
+      handOpacity.value = withDelay(300, withTiming(1, { duration: 300 }));
+      handProgress.value = withDelay(600,
         withRepeat(
           withSequence(
-            withTiming(-50, { duration: 0 }),
-            withTiming(50, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-            withTiming(50, { duration: 600 }),
+            withTiming(0, { duration: 0 }),
+            withTiming(1, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+            withTiming(1, { duration: 500 }),
           ),
-          3,
+          4,
           false
         )
       );
       const timer = setTimeout(() => {
         handOpacity.value = withTiming(0, { duration: 300 });
         setStep('your_turn');
-      }, 5000);
+      }, 6000);
       return () => clearTimeout(timer);
     }
   }, [step]);
 
-  // Detect first match → complete tutorial
+  // Detect first match
   useEffect(() => {
     if (step === 'your_turn' && firstMatchDone) {
-      setTimeout(() => {
-        setStep('done');
-        onComplete();
-      }, 1000);
+      setTimeout(() => { setStep('done'); onComplete(); }, 1000);
     }
   }, [firstMatchDone, step, onComplete]);
 
-  // Fallback: auto-complete after 30s on your_turn
+  // Fallback auto-complete
   useEffect(() => {
     if (step === 'your_turn') {
-      const timer = setTimeout(() => {
-        setStep('done');
-        onComplete();
-      }, 30000);
+      const timer = setTimeout(() => { setStep('done'); onComplete(); }, 30000);
       return () => clearTimeout(timer);
     }
   }, [step, onComplete]);
 
-  const handStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: handY.value }],
-    opacity: handOpacity.value,
-  }));
+  // Hand style: interpolate between first and last planet position
+  const p0 = alignedPlanets[0];
+  const p2 = alignedPlanets[2] || alignedPlanets[alignedPlanets.length - 1];
+  const hasPositions = alignedPlanets.length >= 3 && p0 && p2;
+
+  const handStyle = useAnimatedStyle(() => {
+    if (!hasPositions) {
+      return { opacity: 0 };
+    }
+    const x = p0.x + (p2.x - p0.x) * handProgress.value - 20;
+    const y = p0.y + (p2.y - p0.y) * handProgress.value + boardOffsetY - 20;
+    return {
+      transform: [{ translateX: x }, { translateY: y }],
+      opacity: handOpacity.value,
+    };
+  });
 
   const pulseStyle = useAnimatedStyle(() => ({
-    opacity: pulseOpacity.value,
+    opacity: pulseVal.value,
   }));
 
   if (step === 'done') return null;
@@ -109,11 +130,8 @@ export const Tutorial: React.FC<Props> = ({ onComplete, setPaused, firstMatchDon
   const isBlocking = step === 'look' || step === 'swipe_demo';
 
   return (
-    <View
-      style={styles.overlay}
-      pointerEvents={isBlocking ? 'box-only' : 'box-none'}
-    >
-      {/* Dim overlay during teaching */}
+    <View style={styles.overlay} pointerEvents={isBlocking ? 'box-only' : 'box-none'}>
+      {/* Dim during teaching */}
       {isBlocking && (
         <Animated.View
           entering={FadeIn.duration(300)}
@@ -123,16 +141,31 @@ export const Tutorial: React.FC<Props> = ({ onComplete, setPaused, firstMatchDon
         />
       )}
 
-      {/* Indicator arrow pointing at game area */}
-      {step === 'look' && (
-        <Animated.View style={[styles.lookIndicator, pulseStyle]} pointerEvents="none">
-          <Text style={styles.arrowText}>↕</Text>
-          <Text style={styles.indicatorLabel}>Watch the lines</Text>
+      {/* Highlight rings around aligned planets */}
+      {(step === 'look' || step === 'swipe_demo') && hasPositions && (
+        <Animated.View style={[styles.highlightContainer, pulseStyle]} pointerEvents="none">
+          <Svg width={SCREEN_W} height={500} style={{ position: 'absolute', top: boardOffsetY }}>
+            {/* Connecting line through planets */}
+            <Line
+              x1={p0.x} y1={p0.y}
+              x2={p2.x} y2={p2.y}
+              stroke={p0.color}
+              strokeWidth={3}
+              strokeOpacity={0.6}
+            />
+            {/* Highlight circles */}
+            {alignedPlanets.map((p, i) => (
+              <React.Fragment key={i}>
+                <SvgCircle cx={p.x} cy={p.y} r={24} stroke={p.color} strokeWidth={3} fill="none" strokeOpacity={0.9} />
+                <SvgCircle cx={p.x} cy={p.y} r={28} stroke={p.color} strokeWidth={1} fill="none" strokeOpacity={0.4} />
+              </React.Fragment>
+            ))}
+          </Svg>
         </Animated.View>
       )}
 
-      {/* Hand gesture demo */}
-      {step === 'swipe_demo' && (
+      {/* Animated hand during swipe_demo */}
+      {step === 'swipe_demo' && hasPositions && (
         <Animated.View style={[styles.hand, handStyle]} pointerEvents="none">
           <Text style={styles.handEmoji}>👆</Text>
         </Animated.View>
@@ -143,20 +176,20 @@ export const Tutorial: React.FC<Props> = ({ onComplete, setPaused, firstMatchDon
         <Animated.View entering={FadeIn.duration(400)} key={step}>
           {step === 'look' && (
             <>
-              <Text style={styles.mainText}>Same-color planets are aligning!</Text>
-              <Text style={styles.subText}>Watch for glowing lines between them</Text>
+              <Text style={styles.mainText}>Same planets are aligning!</Text>
+              <Text style={styles.subText}>See the glowing circles and line?</Text>
             </>
           )}
           {step === 'swipe_demo' && (
             <>
               <Text style={styles.mainText}>Swipe through all three!</Text>
-              <Text style={styles.subText}>Drag your finger across the 3 planets</Text>
+              <Text style={styles.subText}>Drag your finger across them to rescue</Text>
             </>
           )}
           {step === 'your_turn' && (
             <>
               <Text style={styles.mainText}>Your turn!</Text>
-              <Text style={styles.subText}>Swipe when the lines appear between 3 planets</Text>
+              <Text style={styles.subText}>Swipe when lines appear between 3 same planets</Text>
             </>
           )}
         </Animated.View>
@@ -181,7 +214,10 @@ const styles = StyleSheet.create({
   },
   dimOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  highlightContainer: {
+    ...StyleSheet.absoluteFillObject,
   },
   textContainer: {
     paddingHorizontal: 30,
@@ -203,33 +239,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
-  lookIndicator: {
-    position: 'absolute',
-    top: '40%',
-    alignSelf: 'center',
-    alignItems: 'center',
-  },
-  arrowText: {
-    fontSize: 36,
-    color: '#ffd700',
-    textShadowColor: '#ff8800',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-  },
-  indicatorLabel: {
-    fontSize: 14,
-    color: '#ffd700',
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginTop: 4,
-  },
   hand: {
     position: 'absolute',
-    top: '42%',
-    alignSelf: 'center',
+    width: 40,
+    height: 40,
   },
   handEmoji: {
-    fontSize: 44,
+    fontSize: 36,
   },
   skipButton: {
     position: 'absolute',

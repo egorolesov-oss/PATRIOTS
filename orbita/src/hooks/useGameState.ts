@@ -58,7 +58,7 @@ export interface UseGameStateReturn {
 export function useGameState(): UseGameStateReturn {
   const [currentLevel, setCurrentLevel] = useState<LevelConfig>(LEVELS[0]);
   const [levelStars, setLevelStars] = useState<number[]>(new Array(LEVELS.length).fill(0));
-  const [maxUnlockedLevel, setMaxUnlockedLevel] = useState(1);
+  const [maxUnlockedLevel, setMaxUnlockedLevel] = useState(10); // all unlocked for testing
 
   const [state, setState] = useState<GameState>({
     planets: [],
