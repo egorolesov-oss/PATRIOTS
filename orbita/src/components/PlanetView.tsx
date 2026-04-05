@@ -72,20 +72,28 @@ export const PlanetView: React.FC<Props> = ({
     const targetY = pos.y - PLANET_SIZE / 2;
 
     if (wasSwapped) {
-      // Animate fly-over to new position
+      // Smooth swap animation: glow up → fly → bounce land → glow down
+      // Glow bright during flight
+      glowOpacity.value = withSequence(
+        withTiming(1, { duration: 100 }),
+        withTiming(1, { duration: 400 }),
+        withTiming(0, { duration: 200 })
+      );
+      // Scale: shrink slightly → grow during flight → bounce land
+      scaleVal.value = withSequence(
+        withTiming(0.7, { duration: 100, easing: Easing.in(Easing.ease) }),
+        withTiming(1.2, { duration: 300, easing: Easing.out(Easing.ease) }),
+        withSpring(1, { damping: 8, stiffness: 150 })
+      );
+      // Fly to new position with smooth easing
       translateX.value = withTiming(targetX, {
-        duration: 300,
-        easing: Easing.inOut(Easing.ease),
+        duration: 500,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       });
       translateY.value = withTiming(targetY, {
-        duration: 300,
-        easing: Easing.inOut(Easing.ease),
+        duration: 500,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       });
-      // Little scale pop on arrival
-      scaleVal.value = withSequence(
-        withTiming(0.8, { duration: 150 }),
-        withSpring(1, { damping: 10 })
-      );
     } else {
       // Normal rotation update — instant
       translateX.value = targetX;
