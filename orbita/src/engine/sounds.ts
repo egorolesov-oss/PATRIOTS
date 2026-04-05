@@ -80,18 +80,19 @@ export const Sounds = {
     osc.stop(ctx.currentTime + 0.35);
   },
 
-  /** Match chime — Dm chord (D F A) */
+  /** Match chime — D major chord (D F# A) — joyful! */
   match() {
-    playChord([294, 349, 440], 0.5, 0.1); // D4, F4, A4
-    setTimeout(() => playTone(587, 0.4, 'sine', 0.06), 150); // D5 sparkle
+    playChord([294, 370, 440], 0.5, 0.1); // D4, F#4, A4
+    setTimeout(() => playTone(587, 0.4, 'sine', 0.08), 150); // D5 sparkle
+    setTimeout(() => playTone(740, 0.3, 'sine', 0.04), 300); // F#5 shimmer
   },
 
-  /** Combo match — ascending Dm inversions */
+  /** Combo match — ascending D major inversions */
   comboMatch(combo: number) {
-    // Dm: D-F-A, higher with each combo
     const octave = combo <= 2 ? 1 : combo <= 4 ? 2 : 4;
-    playChord([294 * octave, 349 * octave, 440 * octave], 0.6, 0.08);
-    setTimeout(() => playTone(587 * octave, 0.5, 'sine', 0.05), 150);
+    playChord([294 * octave, 370 * octave, 440 * octave], 0.6, 0.1);
+    setTimeout(() => playTone(587 * octave, 0.5, 'sine', 0.07), 150);
+    setTimeout(() => playTone(740 * octave, 0.3, 'sine', 0.04), 300);
   },
 
   /** Spawn — A5, D6 */

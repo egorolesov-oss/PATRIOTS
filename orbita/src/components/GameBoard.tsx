@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Line } from 'react-native-svg';
+import Svg, { Line, Circle as SvgCircle } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   ORBIT_CONFIGS,
@@ -184,12 +184,13 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
             );
             const color = PLANET_CONFIGS[triple.type].color;
             const tight = triple.avgAngleDiff < 5;
-            // Pulse effect: oscillate opacity using rotation angle as proxy for time
             const pulse = Math.abs(Math.sin(rotationAngles[0] * 0.15));
             const glowOpacity = tight ? 0.3 + pulse * 0.4 : 0.1 + pulse * 0.15;
             const mainOpacity = tight ? 0.7 + pulse * 0.3 : 0.25 + pulse * 0.15;
             const mainWidth = tight ? 3 : 1.5;
             const glowWidth = tight ? 10 : 5;
+            // Flowing dots: offset moves with time (driven by rotation)
+            const flowOffset = (rotationAngles[0] * 2) % 20;
             return (
               <React.Fragment key={`align-${i}`}>
                 {/* Glow layer */}
@@ -201,24 +202,26 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
                   strokeOpacity={glowOpacity}
                   strokeLinecap="round"
                 />
-                {/* Main line: inner to middle */}
+                {/* Flowing dotted line: inner → middle */}
                 <Line
                   x1={positions[0].x} y1={positions[0].y}
                   x2={positions[1].x} y2={positions[1].y}
                   stroke={color}
                   strokeWidth={mainWidth}
                   strokeOpacity={mainOpacity}
-                  strokeDasharray={tight ? undefined : '6,4'}
+                  strokeDasharray={tight ? '3,5' : '2,8'}
+                  strokeDashoffset={flowOffset}
                   strokeLinecap="round"
                 />
-                {/* Main line: middle to outer */}
+                {/* Flowing dotted line: middle → outer */}
                 <Line
                   x1={positions[1].x} y1={positions[1].y}
                   x2={positions[2].x} y2={positions[2].y}
                   stroke={color}
                   strokeWidth={mainWidth}
                   strokeOpacity={mainOpacity}
-                  strokeDasharray={tight ? undefined : '6,4'}
+                  strokeDasharray={tight ? '3,5' : '2,8'}
+                  strokeDashoffset={flowOffset}
                   strokeLinecap="round"
                 />
               </React.Fragment>
@@ -244,6 +247,46 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
             onTap={selectPlanet}
           />
         ))}
+
+        {/* Swipe trail connecting collected planets */}
+        {swipe.active && swipe.collectedIds.length > 0 && (
+          <Svg width={boardSize} height={boardSize} style={StyleSheet.absoluteFill} pointerEvents="none">
+            {swipe.collectedIds.map((id, i) => {
+              if (i === 0) return null;
+              const prevPlanet = state.planets.find((p) => p.id === swipe.collectedIds[i - 1]);
+              const curPlanet = state.planets.find((p) => p.id === id);
+              if (!prevPlanet || !curPlanet) return null;
+              const prevPos = getSlotPosition(prevPlanet.orbitIndex, prevPlanet.slotIndex, centerX, centerY, rotationAngles[prevPlanet.orbitIndex]);
+              const curPos = getSlotPosition(curPlanet.orbitIndex, curPlanet.slotIndex, centerX, centerY, rotationAngles[curPlanet.orbitIndex]);
+              const color = PLANET_CONFIGS[curPlanet.type]?.color || '#fff';
+              return (
+                <Line
+                  key={`trail-${i}`}
+                  x1={prevPos.x} y1={prevPos.y}
+                  x2={curPos.x} y2={curPos.y}
+                  stroke={color}
+                  strokeWidth={4}
+                  strokeOpacity={0.7}
+                  strokeLinecap="round"
+                />
+              );
+            })}
+            {/* Glow dots on collected planets */}
+            {swipe.collectedIds.map((id) => {
+              const p = state.planets.find((pl) => pl.id === id);
+              if (!p) return null;
+              const pos = getSlotPosition(p.orbitIndex, p.slotIndex, centerX, centerY, rotationAngles[p.orbitIndex]);
+              const color = PLANET_CONFIGS[p.type]?.color || '#fff';
+              return (
+                <SvgCircle
+                  key={`dot-${id}`}
+                  cx={pos.x} cy={pos.y} r={6}
+                  fill={color} fillOpacity={0.9}
+                />
+              );
+            })}
+          </Svg>
+        )}
 
         {state.powerUps.find((p) => p.type === 'STAR_FREEZE' && p.active) && (
           <View style={styles.freezeOverlay} pointerEvents="none" />
