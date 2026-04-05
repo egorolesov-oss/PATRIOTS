@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
+    backgroundColor: 'transparent',
   },
   titleInner: {
     justifyContent: 'center',
