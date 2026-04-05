@@ -27,6 +27,7 @@ import { Tutorial } from './src/components/Tutorial';
 import { useGameState } from './src/hooks/useGameState';
 import { LEVELS } from './src/types/levels';
 import { getSlotPosition } from './src/engine/board';
+import { stopMusic } from './src/engine/sounds';
 import { PLANET_CONFIGS } from './src/types/game';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -206,8 +207,22 @@ function GameScreen() {
       {(state.phase === 'playing' || state.phase === 'won' || state.phase === 'exploding') && !showTitle && !showLevelSelect && (
         <Animated.View entering={FadeIn.delay(200).duration(500)} style={styles.gameContainer}>
           {/* Top: Rescued + Timer + Swaps */}
-          {/* Level name bar */}
-          <Text style={styles.levelBar}>Level {currentLevel.id}: {currentLevel.name}</Text>
+          {/* Level name + menu button */}
+          <View style={styles.levelBarRow}>
+            <Text style={styles.levelBar}>Level {currentLevel.id}: {currentLevel.name}</Text>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => {
+                stopMusic();
+                setShowTitle(true);
+                setShowLevelSelect(false);
+                setShowLevelIntro(false);
+              }}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.menuButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.topBar}>
             <View style={styles.scoreContainer}>
               <Text style={styles.scoreLabel}>RESCUED</Text>
@@ -454,13 +469,33 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
   },
+  levelBarRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 4,
+    paddingHorizontal: 16,
+  },
   levelBar: {
+    flex: 1,
     color: 'rgba(245, 230, 200, 0.4)',
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 2,
-    paddingTop: 4,
+  },
+  menuButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuButtonText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    fontWeight: '700',
   },
   topBar: {
     flexDirection: 'row',
