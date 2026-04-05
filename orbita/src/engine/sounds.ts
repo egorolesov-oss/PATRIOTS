@@ -150,10 +150,10 @@ export async function startMusic() {
   if (musicPlaying) return;
   try {
     const { sound } = await Audio.Sound.createAsync(
-      require('../../assets/**hull-silence**.mp3'),
+      require('../../assets/distant-cathedral.mp3'),
       {
         isLooping: true,
-        volume: 0.3,
+        volume: 0.15,
         shouldPlay: true,
       }
     );
@@ -177,8 +177,8 @@ export async function stopMusic() {
 export async function setMusicUrgency(timeRatio: number) {
   if (!musicSound || !musicPlaying) return;
   try {
-    // Volume increases as star dies: 0.3 → 0.6
-    const vol = 0.3 + (1 - timeRatio) * 0.3;
+    // Volume increases as star dies: 0.15 → 0.35
+    const vol = 0.15 + (1 - timeRatio) * 0.2;
     await musicSound.setVolumeAsync(vol);
     // Speed up slightly as star dies: 1.0 → 1.15
     const rate = 1.0 + (1 - timeRatio) * 0.15;
