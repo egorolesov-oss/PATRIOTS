@@ -83,6 +83,6 @@ export interface OrbitMatch {
 
 export const STAR_SIZE = 50;
 export const PLANET_SIZE = 42;
-export const PLANET_HITBOX = 28;
+export const PLANET_HITBOX = 36;
 export const INITIAL_MOVES = 30;
 export const ROTATION_SLOWDOWN = 0.3;
