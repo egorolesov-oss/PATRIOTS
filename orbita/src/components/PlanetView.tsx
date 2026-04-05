@@ -7,14 +7,13 @@ import Animated, {
   withSpring,
   withSequence,
   withDelay,
+  withRepeat,
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Planet, PLANET_CONFIGS, PLANET_SIZE, ORBIT_CONFIGS } from '../types/game';
-import { getSlotPosition, normalizeAngle } from '../engine/board';
+import { getSlotPosition } from '../engine/board';
 
-// Planet sprite map
 const PLANET_SPRITES: Record<string, any> = {
   planet_red: require('../../assets/planet_red.png'),
   planet_green: require('../../assets/planet_green.png'),
@@ -22,8 +21,6 @@ const PLANET_SPRITES: Record<string, any> = {
   planet_gold: require('../../assets/planet_gold.png'),
   planet_pink: require('../../assets/planet_pink.png'),
   planet_purple: require('../../assets/planet_purple.png'),
-  planet_teal: require('../../assets/planet_teal.png'),
-  planet_volcanic: require('../../assets/planet_volcanic.png'),
 };
 
 interface Props {
@@ -34,7 +31,8 @@ interface Props {
   isSelected: boolean;
   isRemoving: boolean;
   isNew: boolean;
-  isRayHit: boolean;
+  isMatchable: boolean;
+  isCollected: boolean;
   onTap: (planet: Planet) => void;
   swapTarget?: { x: number; y: number } | null;
   onSwapComplete?: () => void;
@@ -48,7 +46,8 @@ export const PlanetView: React.FC<Props> = ({
   isSelected,
   isRemoving,
   isNew,
-  isRayHit,
+  isMatchable,
+  isCollected,
   onTap,
   swapTarget,
   onSwapComplete,
@@ -62,7 +61,6 @@ export const PlanetView: React.FC<Props> = ({
   const opacityVal = useSharedValue(1);
   const glowOpacity = useSharedValue(0);
 
-  // Update position when rotation changes
   useEffect(() => {
     if (!swapTarget) {
       translateX.value = pos.x - PLANET_SIZE / 2;
@@ -70,29 +68,42 @@ export const PlanetView: React.FC<Props> = ({
     }
   }, [pos.x, pos.y, swapTarget]);
 
-  // Selection highlight
+  // Selected
   useEffect(() => {
     if (isSelected) {
       scaleVal.value = withSpring(1.15, { damping: 12 });
       glowOpacity.value = withTiming(0.8, { duration: 200 });
-    } else if (!isRemoving && !isNew) {
+    } else if (!isRemoving && !isNew && !isCollected) {
       scaleVal.value = withSpring(1, { damping: 12 });
       glowOpacity.value = withTiming(0, { duration: 200 });
     }
   }, [isSelected]);
 
-  // Ray hit highlight
+  // Matchable — subtle pulse
   useEffect(() => {
-    if (isRayHit) {
-      scaleVal.value = withSpring(1.3, { damping: 10 });
-      glowOpacity.value = withTiming(1, { duration: 100 });
-    } else if (!isSelected && !isRemoving) {
-      scaleVal.value = withSpring(1, { damping: 12 });
-      glowOpacity.value = withTiming(0, { duration: 150 });
+    if (isMatchable && !isSelected && !isCollected && !isRemoving) {
+      glowOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.5, { duration: 600 }),
+          withTiming(0.1, { duration: 600 })
+        ),
+        -1,
+        true
+      );
+    } else if (!isSelected && !isCollected && !isRemoving) {
+      glowOpacity.value = withTiming(0, { duration: 200 });
     }
-  }, [isRayHit]);
+  }, [isMatchable, isSelected, isCollected, isRemoving]);
 
-  // Removal animation
+  // Collected by swipe — bright highlight
+  useEffect(() => {
+    if (isCollected) {
+      scaleVal.value = withSpring(1.25, { damping: 10 });
+      glowOpacity.value = withTiming(1, { duration: 100 });
+    }
+  }, [isCollected]);
+
+  // Removal
   useEffect(() => {
     if (isRemoving) {
       scaleVal.value = withTiming(1.5, { duration: 300, easing: Easing.out(Easing.ease) });
@@ -103,8 +114,10 @@ export const PlanetView: React.FC<Props> = ({
   // New planet spawn
   useEffect(() => {
     if (isNew) {
-      scaleVal.value = withDelay(400, withSpring(1, { damping: 10, stiffness: 120 }));
+      opacityVal.value = 0;
+      scaleVal.value = 0;
       opacityVal.value = withDelay(400, withTiming(1, { duration: 300 }));
+      scaleVal.value = withDelay(400, withSpring(1, { damping: 10, stiffness: 120 }));
     }
   }, [isNew]);
 
@@ -120,26 +133,16 @@ export const PlanetView: React.FC<Props> = ({
 
       translateX.value = withSequence(
         withTiming(midX, { duration: 150, easing: Easing.in(Easing.ease) }),
-        withTiming(swapTarget.x - PLANET_SIZE / 2, {
-          duration: 150,
-          easing: Easing.out(Easing.ease),
-        })
+        withTiming(swapTarget.x - PLANET_SIZE / 2, { duration: 150, easing: Easing.out(Easing.ease) })
       );
       translateY.value = withSequence(
         withTiming(midY, { duration: 150, easing: Easing.in(Easing.ease) }),
-        withTiming(swapTarget.y - PLANET_SIZE / 2, {
-          duration: 150,
-          easing: Easing.out(Easing.ease),
-        }, () => {
+        withTiming(swapTarget.y - PLANET_SIZE / 2, { duration: 150, easing: Easing.out(Easing.ease) }, () => {
           runOnJS(onSwapComplete)();
         })
       );
     }
   }, [swapTarget]);
-
-  const tapGesture = Gesture.Tap().onEnd(() => {
-    runOnJS(onTap)(planet);
-  });
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -157,22 +160,16 @@ export const PlanetView: React.FC<Props> = ({
   const sprite = PLANET_SPRITES[config.sprite];
 
   return (
-    <GestureDetector gesture={tapGesture}>
-      <Animated.View style={[styles.planetContainer, animatedStyle]}>
-        <Animated.View
-          style={[
-            styles.glow,
-            { backgroundColor: config.color, shadowColor: config.color },
-            glowStyle,
-          ]}
-        />
-        <Image
-          source={sprite}
-          style={styles.planetImage}
-          resizeMode="cover"
-        />
-      </Animated.View>
-    </GestureDetector>
+    <Animated.View style={[styles.planetContainer, animatedStyle]}>
+      <Animated.View
+        style={[
+          styles.glow,
+          { backgroundColor: config.color, shadowColor: config.color },
+          glowStyle,
+        ]}
+      />
+      <Image source={sprite} style={styles.planetImage} resizeMode="cover" />
+    </Animated.View>
   );
 };
 

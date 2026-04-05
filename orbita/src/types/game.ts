@@ -5,14 +5,12 @@ export enum PlanetType {
   GOLD = 'GOLD',
   PINK = 'PINK',
   PURPLE = 'PURPLE',
-  TEAL = 'TEAL',
-  VOLCANIC = 'VOLCANIC',
 }
 
 export interface PlanetConfig {
   type: PlanetType;
   color: string;
-  sprite: string; // asset filename
+  sprite: string;
 }
 
 export const PLANET_CONFIGS: Record<PlanetType, PlanetConfig> = {
@@ -22,14 +20,12 @@ export const PLANET_CONFIGS: Record<PlanetType, PlanetConfig> = {
   [PlanetType.GOLD]: { type: PlanetType.GOLD, color: '#f1c40f', sprite: 'planet_gold' },
   [PlanetType.PINK]: { type: PlanetType.PINK, color: '#e91e90', sprite: 'planet_pink' },
   [PlanetType.PURPLE]: { type: PlanetType.PURPLE, color: '#9b59b6', sprite: 'planet_purple' },
-  [PlanetType.TEAL]: { type: PlanetType.TEAL, color: '#1abc9c', sprite: 'planet_teal' },
-  [PlanetType.VOLCANIC]: { type: PlanetType.VOLCANIC, color: '#e67e22', sprite: 'planet_volcanic' },
 };
 
 export interface Planet {
   id: string;
   type: PlanetType;
-  orbitIndex: number; // 0=inner, 1=middle, 2=outer
+  orbitIndex: number;
   slotIndex: number;
 }
 
@@ -37,7 +33,7 @@ export interface OrbitConfig {
   radius: number;
   slotCount: number;
   rotationDirection: 1 | -1;
-  rotationDuration: number; // seconds for full 360
+  rotationDuration: number;
 }
 
 export const ORBIT_CONFIGS: OrbitConfig[] = [
@@ -45,11 +41,6 @@ export const ORBIT_CONFIGS: OrbitConfig[] = [
   { radius: 115, slotCount: 8, rotationDirection: -1, rotationDuration: 45 },
   { radius: 160, slotCount: 10, rotationDirection: 1, rotationDuration: 60 },
 ];
-
-export interface Conjunction {
-  spokeAngle: number;
-  planets: Planet[];
-}
 
 export enum PowerUpType {
   STAR_FREEZE = 'STAR_FREEZE',
@@ -64,11 +55,12 @@ export interface PowerUpState {
   remainingTime?: number;
 }
 
-export interface SwipeRayState {
+// Swipe collects adjacent same-type planets on one orbit
+export interface SwipeState {
   active: boolean;
-  angle: number; // current swipe angle in degrees
-  hitPlanets: Planet[]; // planets under the ray
-  matchType: PlanetType | null; // the matching type (most numerous same-type across orbits)
+  orbitIndex: number;
+  collectedIds: string[];
+  matchType: PlanetType | null;
 }
 
 export interface GameState {
@@ -78,25 +70,19 @@ export interface GameState {
   selectedPlanetId: string | null;
   phase: 'title' | 'playing' | 'gameover';
   powerUps: PowerUpState[];
-  combo: number; // consecutive successful swipes
+  combo: number;
   bestScore: number;
 }
 
-// Alignment state for a pair/triple of same-type planets across orbits
-export interface AlignmentIndicator {
-  type: PlanetType;
+// Adjacent match on one orbit
+export interface OrbitMatch {
+  orbitIndex: number;
   planets: Planet[];
-  angleDiff: number; // how far from perfect alignment (degrees)
+  type: PlanetType;
 }
 
 export const STAR_SIZE = 50;
-export const STAR_HITZONE = 35; // radius of swipe start zone
 export const PLANET_SIZE = 42;
-export const PLANET_HITBOX = 30; // radius for ray hit detection
-export const SWIPE_TOLERANCE = 8; // degrees tolerance for hitting a planet
-export const INITIAL_MOVES = 25;
-export const ALIGNMENT_FAR = 15; // degrees — start showing indicator
-export const ALIGNMENT_CLOSE = 5; // degrees — bright indicator
-export const ALIGNMENT_PERFECT = 1; // degrees — gold glow
-export const MERCY_WINDOW = 0.5; // seconds after alignment passes
-export const ROTATION_SLOWDOWN = 0.3; // multiplier during swipe (70% slower)
+export const PLANET_HITBOX = 28;
+export const INITIAL_MOVES = 30;
+export const ROTATION_SLOWDOWN = 0.3;
