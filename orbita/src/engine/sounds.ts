@@ -125,12 +125,41 @@ export const Sounds = {
     }
   },
 
-  /** Game over — descending D minor: D5 → Bb4 → F4 → D4 */
+  /** Game over — EXPLOSION: deep boom + descending rumble */
   gameOver() {
-    playTone(587, 0.3, 'sine', 0.1);   // D5
-    setTimeout(() => playTone(466, 0.3, 'sine', 0.1), 300);  // Bb4
-    setTimeout(() => playTone(349, 0.3, 'sine', 0.1), 600);  // F4
-    setTimeout(() => playTone(294, 0.6, 'sine', 0.08), 900); // D4
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    // Deep boom
+    const boom = ctx.createOscillator();
+    const boomGain = ctx.createGain();
+    boom.type = 'sine';
+    boom.frequency.setValueAtTime(80, ctx.currentTime);
+    boom.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 1.5);
+    boomGain.gain.setValueAtTime(0.3, ctx.currentTime);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+    boom.connect(boomGain);
+    boomGain.connect(ctx.destination);
+    boom.start(ctx.currentTime);
+    boom.stop(ctx.currentTime + 1.6);
+
+    // Crackle noise
+    const noise = ctx.createOscillator();
+    const noiseGain = ctx.createGain();
+    noise.type = 'sawtooth';
+    noise.frequency.setValueAtTime(200, ctx.currentTime);
+    noise.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 1);
+    noiseGain.gain.setValueAtTime(0.15, ctx.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1);
+    noise.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    noise.start(ctx.currentTime);
+    noise.stop(ctx.currentTime + 1.1);
+
+    // Descending sad notes after boom
+    setTimeout(() => playTone(466, 0.4, 'sine', 0.12), 800);  // Bb4
+    setTimeout(() => playTone(349, 0.4, 'sine', 0.12), 1200); // F4
+    setTimeout(() => playTone(294, 0.8, 'sine', 0.1), 1600);  // D4
   },
 
   /** Game start — ascending D minor: D4 → F4 → A4 → D5 */
