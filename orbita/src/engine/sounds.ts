@@ -176,11 +176,6 @@ export async function stopMusic() {
   } catch {}
 }
 
-export async function setMusicUrgency(timeRatio: number) {
-  if (!musicSound || !musicPlaying) return;
-  try {
-    // Only adjust volume, no rate change (causes stuttering)
-    const vol = 0.15 + (1 - timeRatio) * 0.15;
-    await musicSound.setVolumeAsync(vol);
-  } catch {}
+export function setMusicUrgency(_timeRatio: number) {
+  // No-op: music plays at constant volume
 }
