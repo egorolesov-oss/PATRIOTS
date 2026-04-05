@@ -51,7 +51,7 @@ export const PlanetView: React.FC<Props> = ({
   const config = PLANET_CONFIGS[planet.type];
   // Random size per planet based on ID (36-48px range)
   const idNum = parseInt(planet.id.replace('p', ''), 10) || 1;
-  const pSize = 29 + ((idNum * 7 + 3) % 10); // deterministic pseudo-random 29-38
+  const pSize = 32 + ((idNum * 7 + 3) % 11); // deterministic pseudo-random 32-42
   const pos = getSlotPosition(planet.orbitIndex, planet.slotIndex, centerX, centerY, rotationAngle);
 
   const translateX = useSharedValue(pos.x - pSize / 2);
