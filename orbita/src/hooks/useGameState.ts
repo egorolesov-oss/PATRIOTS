@@ -122,6 +122,17 @@ export function useGameState(): UseGameStateReturn {
     setState((prev) => {
       const newTime = Math.max(0, prev.timeLeft - dt);
       if (newTime <= 0 && prev.phase === 'playing') {
+        // Check if player actually won at the last moment
+        if (prev.rescued >= prev.rescueTarget) {
+          stopMusic();
+          Sounds.gameStart(); // victory!
+          return {
+            ...prev,
+            timeLeft: 0,
+            phase: 'won',
+            bestRescued: Math.max(prev.bestRescued, prev.rescued),
+          };
+        }
         // Star explodes — start explosion animation
         stopMusic();
         Sounds.gameOver();
