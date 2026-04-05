@@ -9,6 +9,10 @@ import {
 const PLANET_TYPES = Object.values(PlanetType);
 
 let nextId = 1;
+export function resetIdCounter(): void {
+  nextId = 1;
+}
+
 export function generateId(): string {
   return `p${nextId++}`;
 }
@@ -78,7 +82,6 @@ export function findConjunctions(
       getSlotAngle(planet.orbitIndex, planet.slotIndex) +
         rotationAngles[planet.orbitIndex]
     );
-    // Check if this angle is already accounted for
     let found = false;
     for (const existing of spokeAngles) {
       if (angleDiff(angle, existing) < CONJUNCTION_TOLERANCE) {
@@ -142,7 +145,69 @@ export function hasMinConjunctions(
   return findConjunctions(planets, rotations).length >= minCount;
 }
 
+/** Check if any swap on any orbit creates at least one conjunction */
+export function hasPossibleMoves(
+  planets: Planet[],
+  rotationAngles: number[]
+): boolean {
+  for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
+    const orbitPlanets = planets.filter((p) => p.orbitIndex === oi);
+    for (let i = 0; i < orbitPlanets.length; i++) {
+      for (let j = i + 1; j < orbitPlanets.length; j++) {
+        // Simulate swap
+        const swapped = planets.map((p) => {
+          if (p.id === orbitPlanets[i].id) return { ...p, slotIndex: orbitPlanets[j].slotIndex };
+          if (p.id === orbitPlanets[j].id) return { ...p, slotIndex: orbitPlanets[i].slotIndex };
+          return p;
+        });
+        if (findConjunctions(swapped, rotationAngles).length > 0) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/** Reshuffle planet types while keeping positions, ensuring at least 2 conjunctions exist */
+export function reshuffleBoard(planets: Planet[]): Planet[] {
+  let attempts = 0;
+  while (attempts < 50) {
+    const shuffled = planets.map((p) => ({
+      ...p,
+      type: randomPlanetType(),
+    }));
+    if (hasMinConjunctions(shuffled, 2)) {
+      return shuffled;
+    }
+    attempts++;
+  }
+  // Fallback: force conjunctions by placing same types at slot 0 across orbits
+  const shuffled = planets.map((p) => ({
+    ...p,
+    type: randomPlanetType(),
+  }));
+  const type1 = PlanetType.RED;
+  const type2 = PlanetType.BLUE;
+  for (const p of shuffled) {
+    if (p.slotIndex === 0 && (p.orbitIndex === 0 || p.orbitIndex === 1)) {
+      p.type = type1;
+    }
+    // Slot 0 on all orbits aligns at 0 degrees — guaranteed conjunction
+    if (p.slotIndex === 0 && p.orbitIndex === 2) {
+      p.type = type2;
+    }
+    // Use slot that aligns: inner slot 3 = 180°, middle slot 4 = 180°, outer slot 5 = 180°
+    if ((p.orbitIndex === 0 && p.slotIndex === 3) ||
+        (p.orbitIndex === 1 && p.slotIndex === 4)) {
+      p.type = type2;
+    }
+  }
+  return shuffled;
+}
+
 export function generateValidBoard(): Planet[] {
+  resetIdCounter();
   let attempts = 0;
   while (attempts < 100) {
     const board = generateBoard();
@@ -151,26 +216,16 @@ export function generateValidBoard(): Planet[] {
     }
     attempts++;
   }
-  // Fallback: force some conjunctions
+  // Fallback: generate and force conjunctions
   const board = generateBoard();
-  // Place same type on spoke 0 across orbits
-  const type1 = PlanetType.RED;
-  const type2 = PlanetType.BLUE;
-  board[0] = { ...board[0], type: type1 }; // inner slot 0
-  board[6] = { ...board[6], type: type1 }; // middle slot 0
-  board[14] = { ...board[14], type: type2 }; // outer slot 0
-  // Find middle slot closest to 0 degrees
-  board[7] = { ...board[7], type: type2 }; // middle slot 1 (45 deg)
-  // outer slot 1 is 36 deg - close enough with tolerance
-  board[15] = { ...board[15], type: type2 };
-  return board;
+  return reshuffleBoard(board);
 }
 
 export function calculateScore(matchCount: number, cascadeLevel: number): number {
   return matchCount * matchCount * 100 * cascadeLevel;
 }
 
-export function fillEmptySlots(planets: Planet[]): Planet[] {
+export function fillEmptySlots(planets: Planet[], biasType?: PlanetType): Planet[] {
   const occupied = new Set(
     planets.map((p) => `${p.orbitIndex}-${p.slotIndex}`)
   );
@@ -181,9 +236,13 @@ export function fillEmptySlots(planets: Planet[]): Planet[] {
     for (let si = 0; si < config.slotCount; si++) {
       const key = `${oi}-${si}`;
       if (!occupied.has(key)) {
+        // 30% chance to spawn a type that could help create conjunctions
+        const type = biasType && Math.random() < 0.3
+          ? biasType
+          : randomPlanetType();
         newPlanets.push({
           id: generateId(),
-          type: randomPlanetType(),
+          type,
           orbitIndex: oi,
           slotIndex: si,
         });

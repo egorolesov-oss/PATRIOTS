@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   GameState,
   Planet,
@@ -8,7 +8,6 @@ import {
   MAX_CASCADE_DEPTH,
   CRYO_DURATION,
   ORBIT_CONFIGS,
-  PlanetType,
   Conjunction,
 } from '../types/game';
 import {
@@ -18,6 +17,8 @@ import {
   fillEmptySlots,
   getSlotAngle,
   normalizeAngle,
+  hasPossibleMoves,
+  reshuffleBoard,
 } from '../engine/board';
 
 const initialPowerUps: PowerUpState[] = [
@@ -68,36 +69,50 @@ export function useGameState(): UseGameStateReturn {
   const [newPlanetIds, setNewPlanetIds] = useState<Set<string>>(new Set());
   const [swapPair, setSwapPair] = useState<{ a: Planet; b: Planet } | null>(null);
   const processingRef = useRef(false);
+  const cryoActiveRef = useRef(false);
   const cryoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Refs for latest state to avoid stale closures
+  const rotationAnglesRef = useRef(rotationAngles);
+  rotationAnglesRef.current = rotationAngles;
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  const startGame = useCallback(() => {
-    const planets = generateValidBoard();
-    setState({
-      planets,
-      score: 0,
-      movesLeft: INITIAL_MOVES,
-      selectedPlanetId: null,
-      phase: 'playing',
-      powerUps: initialPowerUps.map((p) => ({ ...p })),
-      cascadeLevel: 0,
-      bestScore: state.bestScore,
-    });
-    setActiveConjunctions([]);
-    setMatchingPlanetIds(new Set());
-    setRemovingPlanetIds(new Set());
-    setNewPlanetIds(new Set());
-    setSwapPair(null);
-    setRotationAngles([0, 0, 0]);
+  const finishProcessing = useCallback(() => {
     processingRef.current = false;
-  }, [state.bestScore]);
+    // Don't unpause if Cryo Freeze is active
+    if (!cryoActiveRef.current) {
+      setIsPaused(false);
+    }
+  }, []);
+
+  const checkGameOver = useCallback((planets: Planet[], score: number) => {
+    setState((prev) => {
+      if (prev.movesLeft <= 0) {
+        return {
+          ...prev,
+          planets,
+          score,
+          phase: 'gameover',
+          bestScore: Math.max(prev.bestScore, score),
+        };
+      }
+      // Check for possible moves, reshuffle if none
+      if (!hasPossibleMoves(planets, rotationAnglesRef.current)) {
+        const reshuffled = reshuffleBoard(planets);
+        return { ...prev, planets: reshuffled, score };
+      }
+      return prev;
+    });
+  }, []);
 
   const processConjunctions = useCallback(
-    (planets: Planet[], currentAngles: number[], cascadeLevel: number, currentScore: number) => {
-      const conjunctions = findConjunctions(planets, currentAngles);
+    (planets: Planet[], snapshotAngles: number[], cascadeLevel: number, currentScore: number) => {
+      const conjunctions = findConjunctions(planets, snapshotAngles);
 
       if (conjunctions.length === 0) {
-        processingRef.current = false;
-        setIsPaused(false);
+        finishProcessing();
+        // Check game over after all conjunctions are processed
+        checkGameOver(planets, currentScore);
         return;
       }
 
@@ -126,7 +141,10 @@ export function useGameState(): UseGameStateReturn {
         // Remove matched planets and fill
         setTimeout(() => {
           const remaining = planets.filter((p) => !allMatchIds.has(p.id));
-          const filled = fillEmptySlots(remaining);
+          // Find most common matched type to bias new spawns
+          const matchedTypes = planets.filter((p) => allMatchIds.has(p.id)).map((p) => p.type);
+          const biasType = matchedTypes.length > 0 ? matchedTypes[0] : undefined;
+          const filled = fillEmptySlots(remaining, biasType);
           const newIds = new Set(
             filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
           );
@@ -145,44 +163,70 @@ export function useGameState(): UseGameStateReturn {
           if (cascadeLevel + 1 < MAX_CASCADE_DEPTH) {
             setTimeout(() => {
               setNewPlanetIds(new Set());
-              processConjunctions(filled, currentAngles, cascadeLevel + 1, newScore);
+              processConjunctions(filled, snapshotAngles, cascadeLevel + 1, newScore);
             }, 800);
           } else {
-            processingRef.current = false;
-            setIsPaused(false);
+            finishProcessing();
+            checkGameOver(filled, newScore);
           }
         }, 700);
       }, 800);
     },
-    []
+    [finishProcessing, checkGameOver]
   );
+
+  const startGame = useCallback(() => {
+    const planets = generateValidBoard();
+    if (cryoTimerRef.current) clearInterval(cryoTimerRef.current);
+    cryoActiveRef.current = false;
+    setState({
+      planets,
+      score: 0,
+      movesLeft: INITIAL_MOVES,
+      selectedPlanetId: null,
+      phase: 'playing',
+      powerUps: initialPowerUps.map((p) => ({ ...p })),
+      cascadeLevel: 0,
+      bestScore: stateRef.current.bestScore,
+    });
+    setActiveConjunctions([]);
+    setMatchingPlanetIds(new Set());
+    setRemovingPlanetIds(new Set());
+    setNewPlanetIds(new Set());
+    setSwapPair(null);
+    setRotationAngles([0, 0, 0]);
+    setIsPaused(false);
+    processingRef.current = false;
+  }, []);
 
   const selectPlanet = useCallback(
     (planet: Planet) => {
-      if (state.phase !== 'playing' || processingRef.current) return;
+      if (stateRef.current.phase !== 'playing' || processingRef.current) return;
+      if (stateRef.current.movesLeft <= 0) return;
 
-      if (!state.selectedPlanetId) {
+      if (!stateRef.current.selectedPlanetId) {
         setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
         return;
       }
 
-      if (state.selectedPlanetId === planet.id) {
+      if (stateRef.current.selectedPlanetId === planet.id) {
         setState((prev) => ({ ...prev, selectedPlanetId: null }));
         return;
       }
 
       // Find selected planet
-      const selectedPlanet = state.planets.find((p) => p.id === state.selectedPlanetId);
+      const selectedPlanet = stateRef.current.planets.find(
+        (p) => p.id === stateRef.current.selectedPlanetId
+      );
       if (!selectedPlanet) return;
 
       // Must be same orbit
       if (selectedPlanet.orbitIndex !== planet.orbitIndex) {
-        // Select the new planet instead
         setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
         return;
       }
 
-      // Swap
+      // Swap — snapshot angles now for conjunction checking later
       processingRef.current = true;
       setIsPaused(true);
       setSwapPair({ a: selectedPlanet, b: planet });
@@ -192,12 +236,14 @@ export function useGameState(): UseGameStateReturn {
         movesLeft: prev.movesLeft - 1,
       }));
     },
-    [state.phase, state.selectedPlanetId, state.planets]
+    []
   );
 
   const onSwapComplete = useCallback(() => {
     if (!swapPair) return;
     const { a, b } = swapPair;
+    // Snapshot rotation angles at swap time for consistent conjunction detection
+    const snapshotAngles = [...rotationAnglesRef.current];
 
     setState((prev) => {
       const planets = prev.planets.map((p) => {
@@ -205,39 +251,26 @@ export function useGameState(): UseGameStateReturn {
         if (p.id === b.id) return { ...p, slotIndex: a.slotIndex };
         return p;
       });
-
-      // Check game over
-      const movesLeft = prev.movesLeft;
-      if (movesLeft <= 0) {
-        return {
-          ...prev,
-          planets,
-          phase: 'gameover',
-          bestScore: Math.max(prev.bestScore, prev.score),
-        };
-      }
-
       return { ...prev, planets };
     });
 
     setSwapPair(null);
 
-    // Check conjunctions after a short delay
+    // Check conjunctions with snapshotted angles (not from stale closure)
     setTimeout(() => {
-      setState((prev) => {
-        processConjunctions(prev.planets, rotationAngles, 0, prev.score);
-        return prev;
-      });
+      const currentState = stateRef.current;
+      processConjunctions(currentState.planets, snapshotAngles, 0, currentState.score);
     }, 50);
-  }, [swapPair, rotationAngles, processConjunctions]);
+  }, [swapPair, processConjunctions]);
 
   const handleDragStart = useCallback(
     (planet: Planet) => {
-      if (state.phase !== 'playing' || processingRef.current) return;
+      if (stateRef.current.phase !== 'playing' || processingRef.current) return;
+      if (stateRef.current.movesLeft <= 0) return;
       setIsTouching(true);
       setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
     },
-    [state.phase]
+    []
   );
 
   const handleDragUpdate = useCallback((_planet: Planet, _angle: number) => {
@@ -247,20 +280,20 @@ export function useGameState(): UseGameStateReturn {
   const handleDragEnd = useCallback(
     (planet: Planet) => {
       setIsTouching(false);
-      if (state.phase !== 'playing' || processingRef.current) return;
+      if (stateRef.current.phase !== 'playing' || processingRef.current) return;
+      if (stateRef.current.movesLeft <= 0) return;
 
-      // Snap to nearest slot
       const config = ORBIT_CONFIGS[planet.orbitIndex];
       const currentAngle = normalizeAngle(
         getSlotAngle(planet.orbitIndex, planet.slotIndex) +
-          rotationAngles[planet.orbitIndex]
+          rotationAnglesRef.current[planet.orbitIndex]
       );
 
       let nearestSlot = planet.slotIndex;
       let minDist = Infinity;
       for (let si = 0; si < config.slotCount; si++) {
         const slotAngle = normalizeAngle(
-          (si * 360) / config.slotCount + rotationAngles[planet.orbitIndex]
+          (si * 360) / config.slotCount + rotationAnglesRef.current[planet.orbitIndex]
         );
         const dist = Math.abs(currentAngle - slotAngle);
         if (dist < minDist) {
@@ -270,11 +303,11 @@ export function useGameState(): UseGameStateReturn {
       }
 
       if (nearestSlot !== planet.slotIndex) {
-        // Check if slot is occupied and swap
-        const occupant = state.planets.find(
+        const occupant = stateRef.current.planets.find(
           (p) => p.orbitIndex === planet.orbitIndex && p.slotIndex === nearestSlot
         );
         if (occupant) {
+          const snapshotAngles = [...rotationAnglesRef.current];
           processingRef.current = true;
           setIsPaused(true);
           setState((prev) => ({
@@ -289,41 +322,30 @@ export function useGameState(): UseGameStateReturn {
           }));
 
           setTimeout(() => {
-            setState((prev) => {
-              if (prev.movesLeft <= 0) {
-                return {
-                  ...prev,
-                  phase: 'gameover',
-                  bestScore: Math.max(prev.bestScore, prev.score),
-                };
-              }
-              processConjunctions(prev.planets, rotationAngles, 0, prev.score);
-              return prev;
-            });
+            const currentState = stateRef.current;
+            processConjunctions(currentState.planets, snapshotAngles, 0, currentState.score);
           }, 350);
         }
       }
 
       setState((prev) => ({ ...prev, selectedPlanetId: null }));
     },
-    [state.phase, state.planets, rotationAngles, processConjunctions]
+    [processConjunctions]
   );
 
   const usePowerUp = useCallback(
     (type: PowerUpType) => {
-      if (state.phase !== 'playing') return;
+      if (stateRef.current.phase !== 'playing') return;
 
-      const pu = state.powerUps.find((p) => p.type === type);
+      const pu = stateRef.current.powerUps.find((p) => p.type === type);
       if (!pu || pu.used) return;
 
       switch (type) {
         case PowerUpType.NOVA_BURST: {
-          // Remove all inner orbit planets
-          const innerIds = new Set(
-            state.planets
-              .filter((p) => p.orbitIndex === 0)
-              .map((p) => p.id)
-          );
+          const innerPlanets = stateRef.current.planets.filter((p) => p.orbitIndex === 0);
+          const innerIds = new Set(innerPlanets.map((p) => p.id));
+          // Score based on number cleared
+          const novaScore = innerPlanets.length * 150;
           setRemovingPlanetIds(innerIds);
 
           setTimeout(() => {
@@ -339,7 +361,7 @@ export function useGameState(): UseGameStateReturn {
               return {
                 ...prev,
                 planets: filled,
-                score: prev.score + 500,
+                score: prev.score + novaScore,
                 powerUps: prev.powerUps.map((p) =>
                   p.type === type ? { ...p, used: true } : p
                 ),
@@ -350,6 +372,7 @@ export function useGameState(): UseGameStateReturn {
         }
 
         case PowerUpType.CRYO_FREEZE: {
+          cryoActiveRef.current = true;
           setIsPaused(true);
           setState((prev) => ({
             ...prev,
@@ -363,7 +386,11 @@ export function useGameState(): UseGameStateReturn {
             remaining--;
             if (remaining <= 0) {
               if (cryoTimerRef.current) clearInterval(cryoTimerRef.current);
-              setIsPaused(false);
+              cryoActiveRef.current = false;
+              // Only unpause if not currently processing conjunctions
+              if (!processingRef.current) {
+                setIsPaused(false);
+              }
               setState((prev) => ({
                 ...prev,
                 powerUps: prev.powerUps.map((p) =>
@@ -383,27 +410,33 @@ export function useGameState(): UseGameStateReturn {
         }
 
         case PowerUpType.GRAVITY_WELL: {
-          if (!state.selectedPlanetId) return;
-          const selected = state.planets.find((p) => p.id === state.selectedPlanetId);
+          if (!stateRef.current.selectedPlanetId) return;
+          const selected = stateRef.current.planets.find(
+            (p) => p.id === stateRef.current.selectedPlanetId
+          );
           if (!selected) return;
 
           const targetType = selected.type;
 
-          // For each orbit, group planets of targetType toward each other
           setState((prev) => {
-            const newPlanets = [...prev.planets];
+            const newPlanets = prev.planets.map((p) => ({ ...p }));
             for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
               const orbitPlanets = newPlanets.filter((p) => p.orbitIndex === oi);
               const targets = orbitPlanets.filter((p) => p.type === targetType);
               if (targets.length < 2) continue;
 
-              // Find average slot position and cluster targets around it
               const avgSlot = Math.round(
                 targets.reduce((sum, p) => sum + p.slotIndex, 0) / targets.length
               );
               const slotCount = ORBIT_CONFIGS[oi].slotCount;
 
-              // Sort by distance from avgSlot
+              // Track occupied slots properly — update after each swap
+              const slotOccupants = new Map<number, string>();
+              for (const p of orbitPlanets) {
+                slotOccupants.set(p.slotIndex, p.id);
+              }
+
+              // Sort targets by distance from avgSlot
               targets.sort((a, b) => {
                 const da = Math.min(
                   Math.abs(a.slotIndex - avgSlot),
@@ -416,23 +449,24 @@ export function useGameState(): UseGameStateReturn {
                 return da - db;
               });
 
-              // Try to move targets to adjacent slots around avgSlot
-              const usedSlots = new Set(orbitPlanets.map((p) => p.slotIndex));
               let offset = 0;
               for (const target of targets) {
                 const desiredSlot = ((avgSlot + offset) % slotCount + slotCount) % slotCount;
-                if (!usedSlots.has(desiredSlot) || target.slotIndex === desiredSlot) {
-                  // Swap with whatever is at desiredSlot
-                  const occupant = newPlanets.find(
-                    (p) => p.orbitIndex === oi && p.slotIndex === desiredSlot && p.id !== target.id
-                  );
-                  if (occupant) {
-                    const idx = newPlanets.indexOf(occupant);
-                    newPlanets[idx] = { ...occupant, slotIndex: target.slotIndex };
+                const targetIdx = newPlanets.findIndex((p) => p.id === target.id);
+                const currentSlot = newPlanets[targetIdx].slotIndex;
+
+                if (currentSlot !== desiredSlot) {
+                  const occupantId = slotOccupants.get(desiredSlot);
+                  if (occupantId && occupantId !== target.id) {
+                    const occupantIdx = newPlanets.findIndex((p) => p.id === occupantId);
+                    // Swap: occupant goes to target's current slot
+                    newPlanets[occupantIdx] = { ...newPlanets[occupantIdx], slotIndex: currentSlot };
+                    slotOccupants.set(currentSlot, occupantId);
                   }
-                  const tIdx = newPlanets.indexOf(target);
-                  newPlanets[tIdx] = { ...target, slotIndex: desiredSlot };
+                  newPlanets[targetIdx] = { ...newPlanets[targetIdx], slotIndex: desiredSlot };
+                  slotOccupants.set(desiredSlot, target.id);
                 }
+
                 offset = offset <= 0 ? -offset + 1 : -offset;
               }
             }
@@ -449,18 +483,17 @@ export function useGameState(): UseGameStateReturn {
 
           // Check conjunctions after gravity well
           setTimeout(() => {
+            const snapshotAngles = [...rotationAnglesRef.current];
             processingRef.current = true;
             setIsPaused(true);
-            setState((prev) => {
-              processConjunctions(prev.planets, rotationAngles, 0, prev.score);
-              return prev;
-            });
+            const currentState = stateRef.current;
+            processConjunctions(currentState.planets, snapshotAngles, 0, currentState.score);
           }, 400);
           break;
         }
       }
     },
-    [state.phase, state.powerUps, state.selectedPlanetId, state.planets, rotationAngles, processConjunctions]
+    [processConjunctions]
   );
 
   return {
