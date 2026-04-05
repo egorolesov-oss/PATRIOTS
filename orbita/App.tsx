@@ -40,6 +40,7 @@ function GameScreen() {
   const [pendingLevelId, setPendingLevelId] = useState(1);
   const [showTutorial, setShowTutorial] = useState(true);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
+  const [tutorialPaused, setTutorialPaused] = useState(false);
 
   // Very slow background rotation
   const bgRotation = useSharedValue(0);
@@ -214,7 +215,7 @@ function GameScreen() {
 
           {/* Center: Game Board */}
           <View style={styles.boardWrapper}>
-            <GameBoard game={game} boardSize={boardSize} />
+            <GameBoard game={game} boardSize={boardSize} tutorialPaused={tutorialPaused} />
           </View>
 
           {/* Red vignette when time is running out */}
@@ -256,10 +257,15 @@ function GameScreen() {
 
       {/* Tutorial overlay on Level 1 */}
       {state.phase === 'playing' && currentLevel.id === 1 && !tutorialCompleted && showTutorial && (
-        <Tutorial onComplete={() => {
-          setShowTutorial(false);
-          setTutorialCompleted(true);
-        }} />
+        <Tutorial
+          onComplete={() => {
+            setShowTutorial(false);
+            setTutorialCompleted(true);
+            setTutorialPaused(false);
+          }}
+          setPaused={setTutorialPaused}
+          firstMatchDone={state.rescued > 0}
+        />
       )}
 
       {/* Supernova Explosion Animation */}

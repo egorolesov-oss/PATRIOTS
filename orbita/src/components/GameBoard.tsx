@@ -19,9 +19,10 @@ import { UseGameStateReturn } from '../hooks/useGameState';
 interface Props {
   game: UseGameStateReturn;
   boardSize: number;
+  tutorialPaused?: boolean;
 }
 
-export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
+export const GameBoard: React.FC<Props> = ({ game, boardSize, tutorialPaused }) => {
   const {
     state,
     rotationAngles,
@@ -57,7 +58,7 @@ export const GameBoard: React.FC<Props> = ({ game, boardSize }) => {
       const dt = (time - lastTimeRef.current) / 1000;
       lastTimeRef.current = time;
 
-      if (!isPaused) {
+      if (!isPaused && !tutorialPaused) {
         // Accelerate rotation as star dies (last 25% = 1.5x speed)
         const timeRatio = state.timeLeft / state.totalTime;
         const urgency = timeRatio < 0.25 ? 1.5 : timeRatio < 0.5 ? 1.2 : 1;

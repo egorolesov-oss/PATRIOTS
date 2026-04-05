@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -12,142 +12,162 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+type TutorialStep = 'look' | 'swipe_demo' | 'your_turn' | 'done';
 
 interface Props {
   onComplete: () => void;
+  setPaused: (paused: boolean) => void;
+  firstMatchDone: boolean;
 }
 
-type TutorialStep = 'look' | 'swipe_demo' | 'your_turn' | 'wait' | 'done';
-
-export const Tutorial: React.FC<Props> = ({ onComplete }) => {
+export const Tutorial: React.FC<Props> = ({ onComplete, setPaused, firstMatchDone }) => {
   const [step, setStep] = useState<TutorialStep>('look');
-  const [showHand, setShowHand] = useState(false);
 
-  // Hand animation for swipe demo
-  const handX = useSharedValue(0);
+  // Hand animation
   const handY = useSharedValue(0);
   const handOpacity = useSharedValue(0);
+  // Pulse for "look" step
+  const pulseOpacity = useSharedValue(0.5);
 
+  // Pause orbits during teaching steps
   useEffect(() => {
-    // Step progression timers
+    if (step === 'look' || step === 'swipe_demo') {
+      setPaused(true);
+    } else {
+      setPaused(false);
+    }
+  }, [step, setPaused]);
+
+  // Step progression
+  useEffect(() => {
     if (step === 'look') {
-      setTimeout(() => setStep('swipe_demo'), 3000);
-    } else if (step === 'swipe_demo') {
-      setShowHand(true);
-      // Animate hand swipe gesture
-      handOpacity.value = withDelay(500, withTiming(1, { duration: 300 }));
-      handX.value = withDelay(800,
-        withRepeat(
-          withSequence(
-            withTiming(-40, { duration: 0 }),
-            withTiming(40, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-            withTiming(40, { duration: 500 }),
-          ),
-          3,
-          false
-        )
+      // Pulse animation for "watch" step
+      pulseOpacity.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 800 }),
+          withTiming(0.3, { duration: 800 })
+        ),
+        -1,
+        true
       );
+      const timer = setTimeout(() => setStep('swipe_demo'), 3500);
+      return () => clearTimeout(timer);
+    } else if (step === 'swipe_demo') {
+      // Show animated hand swiping downward (from inner orbit to outer)
+      handOpacity.value = withDelay(500, withTiming(1, { duration: 300 }));
       handY.value = withDelay(800,
         withRepeat(
           withSequence(
-            withTiming(40, { duration: 0 }),
-            withTiming(-40, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-            withTiming(-40, { duration: 500 }),
+            withTiming(-50, { duration: 0 }),
+            withTiming(50, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+            withTiming(50, { duration: 600 }),
           ),
           3,
           false
         )
       );
-      setTimeout(() => {
-        setShowHand(false);
+      const timer = setTimeout(() => {
         handOpacity.value = withTiming(0, { duration: 300 });
         setStep('your_turn');
       }, 5000);
-    } else if (step === 'your_turn') {
-      // Wait for player to make first match (handled externally)
-      // Auto-advance after 15s if stuck
-      setTimeout(() => setStep('wait'), 15000);
-    } else if (step === 'wait') {
-      setTimeout(() => setStep('done'), 8000);
-    } else if (step === 'done') {
-      onComplete();
+      return () => clearTimeout(timer);
     }
   }, [step]);
 
-  // Allow skipping
-  const handleSkip = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
+  // Detect first match → complete tutorial
+  useEffect(() => {
+    if (step === 'your_turn' && firstMatchDone) {
+      setTimeout(() => {
+        setStep('done');
+        onComplete();
+      }, 1000);
+    }
+  }, [firstMatchDone, step, onComplete]);
 
-  // Notify parent when player should attempt swipe
+  // Fallback: auto-complete after 30s on your_turn
   useEffect(() => {
     if (step === 'your_turn') {
-      // This is when the game should be interactive
+      const timer = setTimeout(() => {
+        setStep('done');
+        onComplete();
+      }, 30000);
+      return () => clearTimeout(timer);
     }
-  }, [step]);
+  }, [step, onComplete]);
 
   const handStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: handX.value },
-      { translateY: handY.value },
-    ],
+    transform: [{ translateY: handY.value }],
     opacity: handOpacity.value,
   }));
 
-  const getText = () => {
-    switch (step) {
-      case 'look':
-        return 'Three same-color planets are aligning...';
-      case 'swipe_demo':
-        return 'Swipe through all three to rescue them!';
-      case 'your_turn':
-        return 'Your turn — swipe when the lines appear!';
-      case 'wait':
-        return 'Wait for the alignment... then swipe!';
-      case 'done':
-        return '';
-    }
-  };
-
-  const getSubtext = () => {
-    switch (step) {
-      case 'look':
-        return 'Watch the glowing lines between them';
-      case 'swipe_demo':
-        return 'Drag your finger from one planet to another';
-      case 'your_turn':
-        return 'Look for glowing lines connecting 3 planets';
-      case 'wait':
-        return 'The orbits are rotating — timing is key!';
-      default:
-        return '';
-    }
-  };
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+  }));
 
   if (step === 'done') return null;
 
-  return (
-    <View style={styles.overlay} pointerEvents="box-none">
-      {/* Tutorial text */}
-      <Animated.View
-        entering={FadeIn.duration(500)}
-        style={styles.textContainer}
-      >
-        <Text style={styles.mainText}>{getText()}</Text>
-        <Text style={styles.subText}>{getSubtext()}</Text>
-      </Animated.View>
+  const isBlocking = step === 'look' || step === 'swipe_demo';
 
-      {/* Hand gesture animation */}
-      {showHand && (
-        <Animated.View style={[styles.hand, handStyle]}>
+  return (
+    <View
+      style={styles.overlay}
+      pointerEvents={isBlocking ? 'box-only' : 'box-none'}
+    >
+      {/* Dim overlay during teaching */}
+      {isBlocking && (
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(300)}
+          style={styles.dimOverlay}
+          pointerEvents="none"
+        />
+      )}
+
+      {/* Indicator arrow pointing at game area */}
+      {step === 'look' && (
+        <Animated.View style={[styles.lookIndicator, pulseStyle]} pointerEvents="none">
+          <Text style={styles.arrowText}>↕</Text>
+          <Text style={styles.indicatorLabel}>Watch the lines</Text>
+        </Animated.View>
+      )}
+
+      {/* Hand gesture demo */}
+      {step === 'swipe_demo' && (
+        <Animated.View style={[styles.hand, handStyle]} pointerEvents="none">
           <Text style={styles.handEmoji}>👆</Text>
         </Animated.View>
       )}
 
-      {/* Skip button */}
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-        <Text style={styles.skipText}>Skip tutorial</Text>
+      {/* Tutorial text */}
+      <View style={styles.textContainer}>
+        <Animated.View entering={FadeIn.duration(400)} key={step}>
+          {step === 'look' && (
+            <>
+              <Text style={styles.mainText}>Same-color planets are aligning!</Text>
+              <Text style={styles.subText}>Watch for glowing lines between them</Text>
+            </>
+          )}
+          {step === 'swipe_demo' && (
+            <>
+              <Text style={styles.mainText}>Swipe through all three!</Text>
+              <Text style={styles.subText}>Drag your finger across the 3 planets</Text>
+            </>
+          )}
+          {step === 'your_turn' && (
+            <>
+              <Text style={styles.mainText}>Your turn!</Text>
+              <Text style={styles.subText}>Swipe when the lines appear between 3 planets</Text>
+            </>
+          )}
+        </Animated.View>
+      </View>
+
+      {/* Skip */}
+      <TouchableOpacity
+        style={styles.skipButton}
+        onPress={() => { setStep('done'); onComplete(); }}
+      >
+        <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
     </View>
   );
@@ -156,47 +176,71 @@ export const Tutorial: React.FC<Props> = ({ onComplete }) => {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    alignItems: 'center',
     zIndex: 200,
+    justifyContent: 'flex-end',
+  },
+  dimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   textContainer: {
-    marginTop: 60,
     paddingHorizontal: 30,
+    paddingBottom: 140,
     alignItems: 'center',
   },
   mainText: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
     color: '#ffffff',
     textAlign: 'center',
     textShadowColor: '#000',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
   subText: {
     fontSize: 14,
-    color: 'rgba(245, 230, 200, 0.6)',
+    color: 'rgba(245, 230, 200, 0.7)',
     textAlign: 'center',
     marginTop: 8,
-    letterSpacing: 0.5,
+  },
+  lookIndicator: {
+    position: 'absolute',
+    top: '40%',
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  arrowText: {
+    fontSize: 36,
+    color: '#ffd700',
+    textShadowColor: '#ff8800',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  indicatorLabel: {
+    fontSize: 14,
+    color: '#ffd700',
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: 4,
   },
   hand: {
     position: 'absolute',
-    top: '45%',
-    left: '45%',
+    top: '42%',
+    alignSelf: 'center',
   },
   handEmoji: {
-    fontSize: 40,
+    fontSize: 44,
   },
   skipButton: {
-    marginBottom: 120,
+    position: 'absolute',
+    bottom: 130,
+    alignSelf: 'center',
     paddingHorizontal: 20,
     paddingVertical: 8,
   },
   skipText: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.35)',
+    color: 'rgba(255,255,255,0.3)',
     letterSpacing: 1,
   },
 });
