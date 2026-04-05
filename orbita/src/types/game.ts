@@ -68,7 +68,7 @@ export interface GameState {
   rescueTarget: number;  // how many to save to win
   swapsLeft: number;
   selectedPlanetId: string | null;
-  phase: 'title' | 'playing' | 'won' | 'gameover';
+  phase: 'title' | 'playing' | 'exploding' | 'won' | 'gameover';
   powerUps: PowerUpState[];
   combo: number;
   bestRescued: number;

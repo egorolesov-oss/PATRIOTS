@@ -111,15 +111,22 @@ export function useGameState(): UseGameStateReturn {
 
     setState((prev) => {
       const newTime = Math.max(0, prev.timeLeft - dt);
-      if (newTime <= 0) {
-        // Star explodes — game over
+      if (newTime <= 0 && prev.phase === 'playing') {
+        // Star explodes — start explosion animation
         stopMusic();
         Sounds.gameOver();
+        // Transition to gameover after 4 seconds
+        setTimeout(() => {
+          setState((p) => ({
+            ...p,
+            phase: 'gameover',
+            bestRescued: Math.max(p.bestRescued, p.rescued),
+          }));
+        }, 4000);
         return {
           ...prev,
           timeLeft: 0,
-          phase: 'gameover',
-          bestRescued: Math.max(prev.bestRescued, prev.rescued),
+          phase: 'exploding',
         };
       }
       return { ...prev, timeLeft: newTime };

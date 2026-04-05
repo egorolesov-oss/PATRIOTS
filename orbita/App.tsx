@@ -16,6 +16,7 @@ import Animated, {
 import { StarField } from './src/components/StarField';
 import { GameBoard } from './src/components/GameBoard';
 import { PowerUpPanel } from './src/components/PowerUpPanel';
+import { SupernovaExplosion } from './src/components/SupernovaExplosion';
 import { useGameState } from './src/hooks/useGameState';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -66,7 +67,7 @@ function GameScreen() {
       )}
 
       {/* Game UI */}
-      {(state.phase === 'playing' || state.phase === 'won') && !showTitle && (
+      {(state.phase === 'playing' || state.phase === 'won' || state.phase === 'exploding') && !showTitle && (
         <Animated.View entering={FadeIn.delay(200).duration(500)} style={styles.gameContainer}>
           {/* Top: Rescued + Timer + Swaps */}
           <View style={styles.topBar}>
@@ -121,6 +122,14 @@ function GameScreen() {
             </View>
           </View>
         </Animated.View>
+      )}
+
+      {/* Supernova Explosion Animation */}
+      {state.phase === 'exploding' && (
+        <SupernovaExplosion
+          centerX={SCREEN_W / 2}
+          centerY={SCREEN_H * 0.4}
+        />
       )}
 
       {/* Won Screen */}
