@@ -23,7 +23,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
     slots: [3, 4, 5],   // 12 planets
-    speedMultiplier: 0.8,
+    speedMultiplier: 0.7,
     alignmentTolerance: 25,
     powerUps: [],
     newMechanic: 'Swipe through 3 same-color planets when they align!',
@@ -36,7 +36,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
     slots: [4, 5, 6],   // 15 planets
-    speedMultiplier: 0.9,
+    speedMultiplier: 0.75,
     alignmentTolerance: 22,
     powerUps: [{ type: PowerUpType.STAR_FREEZE, uses: 1 }],
     newMechanic: 'FREEZE stops all orbits for 8 seconds!',
@@ -49,7 +49,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD],
     slots: [4, 6, 7],   // 17 planets
-    speedMultiplier: 0.8,
+    speedMultiplier: 0.85,
     alignmentTolerance: 20,
     powerUps: [
       { type: PowerUpType.STAR_FREEZE, uses: 1 },
@@ -65,7 +65,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 5,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD],
     slots: [5, 6, 8],   // 19 planets
-    speedMultiplier: 1.0,
+    speedMultiplier: 0.9,
     alignmentTolerance: 18,
     powerUps: [
       { type: PowerUpType.STAR_FREEZE, uses: 1 },
@@ -81,7 +81,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 4,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK],
     slots: [5, 7, 8],   // 20 planets
-    speedMultiplier: 1.2,
+    speedMultiplier: 1.0,
     alignmentTolerance: 16,
     powerUps: [
       { type: PowerUpType.STAR_FREEZE, uses: 1 },
@@ -97,7 +97,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 4,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK],
     slots: [5, 7, 9],   // 21 planets
-    speedMultiplier: 1.3,
+    speedMultiplier: 1.1,
     alignmentTolerance: 14,
     powerUps: [
       { type: PowerUpType.STAR_FREEZE, uses: 2 },
@@ -112,7 +112,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
     slots: [6, 7, 9],   // 22 planets
-    speedMultiplier: 1.4,
+    speedMultiplier: 1.2,
     alignmentTolerance: 12,
     powerUps: [
       { type: PowerUpType.STAR_FREEZE, uses: 1 },
@@ -127,7 +127,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
     slots: [6, 8, 9],   // 23 planets
-    speedMultiplier: 1.5,
+    speedMultiplier: 1.3,
     alignmentTolerance: 11,
     powerUps: [
       { type: PowerUpType.NOVA_PULSE, uses: 1 },
@@ -142,7 +142,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 2,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
     slots: [6, 8, 10],  // 24 planets
-    speedMultiplier: 1.6,
+    speedMultiplier: 1.4,
     alignmentTolerance: 10,
     powerUps: [
       { type: PowerUpType.ANTIGRAVITY, uses: 1 },
@@ -156,7 +156,7 @@ export const LEVELS: LevelConfig[] = [
     swaps: 2,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
     slots: [6, 8, 10],  // 24 planets
-    speedMultiplier: 1.8,
+    speedMultiplier: 1.5,
     alignmentTolerance: 9,
     powerUps: [
       { type: PowerUpType.STAR_FREEZE, uses: 1 },
