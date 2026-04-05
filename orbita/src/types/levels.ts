@@ -35,7 +35,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 1,
     name: 'First Constellation',
-    time: 180,
+    time: 120,
     rescueTarget: 6,
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
@@ -48,7 +48,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 2,
     name: 'Dance of Orbits',
-    time: 150,
+    time: 120,
     rescueTarget: 9,
     swaps: 0,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN],
@@ -61,7 +61,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 3,
     name: 'Magnetic Storm',
-    time: 130,
+    time: 120,
     rescueTarget: 12,
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD],
@@ -93,7 +93,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 5,
     name: 'Quantum Leap',
-    time: 110,
+    time: 120,
     rescueTarget: 15,
     swaps: 4,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK],
@@ -109,7 +109,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 6,
     name: 'Gravitational Lens',
-    time: 100,
+    time: 120,
     rescueTarget: 18,
     swaps: 4,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK],
@@ -124,7 +124,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 7,
     name: 'Black Hole Nearby',
-    time: 90,
+    time: 120,
     rescueTarget: 18,
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
@@ -139,7 +139,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 8,
     name: 'Agony of a Superstar',
-    time: 85,
+    time: 120,
     rescueTarget: 21,
     swaps: 3,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
@@ -154,7 +154,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 9,
     name: 'Final Flare',
-    time: 80,
+    time: 120,
     rescueTarget: 21,
     swaps: 2,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
@@ -168,7 +168,7 @@ export const LEVELS: LevelConfig[] = [
   {
     id: 10,
     name: 'Supernova',
-    time: 75,
+    time: 120,
     rescueTarget: 24,
     swaps: 2,
     planetTypes: [PlanetType.RED, PlanetType.BLUE, PlanetType.GREEN, PlanetType.GOLD, PlanetType.PINK, PlanetType.PURPLE],
