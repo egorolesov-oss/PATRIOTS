@@ -12,6 +12,7 @@
     "@expo/metro-runtime": "^55.0.9",
     "babel-preset-expo": "^55.0.15",
     "expo": "~54.0.33",
+    "expo-av": "^16.0.8",
     "expo-screen-orientation": "~8.1.2",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
