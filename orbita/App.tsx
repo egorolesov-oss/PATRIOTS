@@ -45,7 +45,7 @@ function GameScreen() {
   }, []);
   const bgAnimStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale: 1.4 }, // scale up so edges don't show during rotation
+      { scale: 1.5 }, // √2 ≈ 1.42, round up for safety
       { rotate: `${bgRotation.value}deg` },
     ],
   }));
