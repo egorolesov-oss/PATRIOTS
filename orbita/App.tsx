@@ -63,14 +63,24 @@ function GameScreen() {
       {/* Game UI */}
       {state.phase === 'playing' && !showTitle && (
         <Animated.View entering={FadeIn.delay(200).duration(500)} style={styles.gameContainer}>
-          {/* Top: Score + Moves */}
+          {/* Top: Score + Combo + Moves */}
           <View style={styles.topBar}>
             <View style={styles.scoreContainer}>
               <Text style={styles.scoreLabel}>SCORE</Text>
               <Text style={styles.scoreValue}>{state.score.toLocaleString()}</Text>
             </View>
+            {state.combo >= 2 && (
+              <View style={styles.comboContainer}>
+                <Text style={styles.comboValue}>x{
+                  state.combo >= 5 ? '3.0' :
+                  state.combo >= 4 ? '2.5' :
+                  state.combo >= 3 ? '2.0' : '1.5'
+                }</Text>
+                <Text style={styles.comboLabel}>COMBO</Text>
+              </View>
+            )}
             <View style={styles.movesContainer}>
-              <Text style={styles.movesLabel}>MOVES</Text>
+              <Text style={styles.movesLabel}>SWAPS</Text>
               <Text style={[styles.movesValue, state.movesLeft <= 5 && styles.movesLow]}>
                 {state.movesLeft}
               </Text>
@@ -86,7 +96,6 @@ function GameScreen() {
           <View style={styles.bottomPanel}>
             <PowerUpPanel
               powerUps={state.powerUps}
-              selectedPlanetId={state.selectedPlanetId}
               onUsePowerUp={usePowerUp}
             />
             <View style={styles.progressBarContainer}>
@@ -196,6 +205,23 @@ const styles = StyleSheet.create({
     color: '#f5e6c8',
     fontSize: 32,
     fontWeight: '900',
+  },
+  comboContainer: {
+    alignItems: 'center',
+  },
+  comboValue: {
+    color: '#ffd700',
+    fontSize: 28,
+    fontWeight: '900',
+    textShadowColor: '#ff8800',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  comboLabel: {
+    color: 'rgba(255, 215, 0, 0.6)',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
   movesContainer: {
     alignItems: 'flex-end',

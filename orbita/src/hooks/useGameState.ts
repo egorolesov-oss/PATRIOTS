@@ -2,49 +2,48 @@ import { useState, useCallback, useRef } from 'react';
 import {
   GameState,
   Planet,
+  PlanetType,
   PowerUpType,
   PowerUpState,
+  SwipeRayState,
+  AlignmentIndicator,
   INITIAL_MOVES,
-  MAX_CASCADE_DEPTH,
-  CRYO_DURATION,
+  ALIGNMENT_PERFECT,
   ORBIT_CONFIGS,
-  Conjunction,
 } from '../types/game';
 import {
-  generateValidBoard,
-  findConjunctions,
-  calculateScore,
+  generateBoard,
+  findPlanetsOnRay,
+  findBestMatch,
+  findAlignments,
+  calculateSwipeScore,
   fillEmptySlots,
-  getSlotAngle,
   normalizeAngle,
-  hasPossibleMoves,
-  reshuffleBoard,
 } from '../engine/board';
 
 const initialPowerUps: PowerUpState[] = [
-  { type: PowerUpType.NOVA_BURST, used: false, active: false },
-  { type: PowerUpType.CRYO_FREEZE, used: false, active: false },
-  { type: PowerUpType.GRAVITY_WELL, used: false, active: false },
+  { type: PowerUpType.STAR_FREEZE, used: false, active: false },
+  { type: PowerUpType.NOVA_PULSE, used: false, active: false },
+  { type: PowerUpType.CLEANSE_RAY, used: false, active: false },
 ];
 
 export interface UseGameStateReturn {
   state: GameState;
   rotationAngles: number[];
-  isTouching: boolean;
+  isSwiping: boolean;
   isPaused: boolean;
-  activeConjunctions: Conjunction[];
-  matchingPlanetIds: Set<string>;
+  swipeRay: SwipeRayState;
+  alignments: AlignmentIndicator[];
   removingPlanetIds: Set<string>;
   newPlanetIds: Set<string>;
   swapPair: { a: Planet; b: Planet } | null;
   startGame: () => void;
   selectPlanet: (planet: Planet) => void;
-  handleDragStart: (planet: Planet) => void;
-  handleDragUpdate: (planet: Planet, angle: number) => void;
-  handleDragEnd: (planet: Planet) => void;
+  startSwipe: () => void;
+  updateSwipe: (angle: number) => void;
+  endSwipe: () => void;
   usePowerUp: (type: PowerUpType) => void;
   onSwapComplete: () => void;
-  setIsTouching: (v: boolean) => void;
   setRotationAngles: React.Dispatch<React.SetStateAction<number[]>>;
 }
 
@@ -56,129 +55,50 @@ export function useGameState(): UseGameStateReturn {
     selectedPlanetId: null,
     phase: 'title',
     powerUps: initialPowerUps.map((p) => ({ ...p })),
-    cascadeLevel: 0,
+    combo: 0,
     bestScore: 0,
   });
 
   const [rotationAngles, setRotationAngles] = useState([0, 0, 0]);
-  const [isTouching, setIsTouching] = useState(false);
+  const [isSwiping, setIsSwiping] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [activeConjunctions, setActiveConjunctions] = useState<Conjunction[]>([]);
-  const [matchingPlanetIds, setMatchingPlanetIds] = useState<Set<string>>(new Set());
+  const [swipeRay, setSwipeRay] = useState<SwipeRayState>({
+    active: false,
+    angle: 0,
+    hitPlanets: [],
+    matchType: null,
+  });
+  const [alignments, setAlignments] = useState<AlignmentIndicator[]>([]);
   const [removingPlanetIds, setRemovingPlanetIds] = useState<Set<string>>(new Set());
   const [newPlanetIds, setNewPlanetIds] = useState<Set<string>>(new Set());
   const [swapPair, setSwapPair] = useState<{ a: Planet; b: Planet } | null>(null);
   const processingRef = useRef(false);
-  const cryoActiveRef = useRef(false);
-  const cryoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Refs for latest state to avoid stale closures
-  const rotationAnglesRef = useRef(rotationAngles);
-  rotationAnglesRef.current = rotationAngles;
+  const freezeActiveRef = useRef(false);
+  const freezeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const rotationAnglesRef = useRef(rotationAngles);
+  rotationAnglesRef.current = rotationAngles;
+
+  // Update alignments periodically (called from GameBoard animation loop)
+  const updateAlignments = useCallback(() => {
+    const current = stateRef.current;
+    if (current.phase !== 'playing' || processingRef.current) return;
+    const a = findAlignments(current.planets, rotationAnglesRef.current);
+    setAlignments(a);
+  }, []);
 
   const finishProcessing = useCallback(() => {
     processingRef.current = false;
-    // Don't unpause if Cryo Freeze is active
-    if (!cryoActiveRef.current) {
+    if (!freezeActiveRef.current) {
       setIsPaused(false);
     }
   }, []);
 
-  const checkGameOver = useCallback((planets: Planet[], score: number) => {
-    setState((prev) => {
-      if (prev.movesLeft <= 0) {
-        return {
-          ...prev,
-          planets,
-          score,
-          phase: 'gameover',
-          bestScore: Math.max(prev.bestScore, score),
-        };
-      }
-      // Check for possible moves, reshuffle if none
-      if (!hasPossibleMoves(planets, rotationAnglesRef.current)) {
-        const reshuffled = reshuffleBoard(planets);
-        return { ...prev, planets: reshuffled, score };
-      }
-      return prev;
-    });
-  }, []);
-
-  const processConjunctions = useCallback(
-    (planets: Planet[], snapshotAngles: number[], cascadeLevel: number, currentScore: number) => {
-      const conjunctions = findConjunctions(planets, snapshotAngles);
-
-      if (conjunctions.length === 0) {
-        finishProcessing();
-        // Check game over after all conjunctions are processed
-        checkGameOver(planets, currentScore);
-        return;
-      }
-
-      const allMatchIds = new Set<string>();
-      for (const c of conjunctions) {
-        for (const p of c.planets) {
-          allMatchIds.add(p.id);
-        }
-      }
-
-      setActiveConjunctions(conjunctions);
-      setMatchingPlanetIds(allMatchIds);
-
-      // After matching animation, remove planets
-      setTimeout(() => {
-        setRemovingPlanetIds(allMatchIds);
-        setActiveConjunctions([]);
-
-        // Calculate score
-        let matchScore = 0;
-        for (const c of conjunctions) {
-          matchScore += calculateScore(c.planets.length, cascadeLevel + 1);
-        }
-        const newScore = currentScore + matchScore;
-
-        // Remove matched planets and fill
-        setTimeout(() => {
-          const remaining = planets.filter((p) => !allMatchIds.has(p.id));
-          // Find most common matched type to bias new spawns
-          const matchedTypes = planets.filter((p) => allMatchIds.has(p.id)).map((p) => p.type);
-          const biasType = matchedTypes.length > 0 ? matchedTypes[0] : undefined;
-          const filled = fillEmptySlots(remaining, biasType);
-          const newIds = new Set(
-            filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
-          );
-
-          setState((prev) => ({
-            ...prev,
-            planets: filled,
-            score: newScore,
-            cascadeLevel: cascadeLevel + 1,
-          }));
-          setMatchingPlanetIds(new Set());
-          setRemovingPlanetIds(new Set());
-          setNewPlanetIds(newIds);
-
-          // Check for cascades
-          if (cascadeLevel + 1 < MAX_CASCADE_DEPTH) {
-            setTimeout(() => {
-              setNewPlanetIds(new Set());
-              processConjunctions(filled, snapshotAngles, cascadeLevel + 1, newScore);
-            }, 800);
-          } else {
-            finishProcessing();
-            checkGameOver(filled, newScore);
-          }
-        }, 700);
-      }, 800);
-    },
-    [finishProcessing, checkGameOver]
-  );
-
   const startGame = useCallback(() => {
-    const planets = generateValidBoard();
-    if (cryoTimerRef.current) clearInterval(cryoTimerRef.current);
-    cryoActiveRef.current = false;
+    const planets = generateBoard();
+    if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
+    freezeActiveRef.current = false;
     setState({
       planets,
       score: 0,
@@ -186,64 +106,170 @@ export function useGameState(): UseGameStateReturn {
       selectedPlanetId: null,
       phase: 'playing',
       powerUps: initialPowerUps.map((p) => ({ ...p })),
-      cascadeLevel: 0,
+      combo: 0,
       bestScore: stateRef.current.bestScore,
     });
-    setActiveConjunctions([]);
-    setMatchingPlanetIds(new Set());
+    setAlignments([]);
     setRemovingPlanetIds(new Set());
     setNewPlanetIds(new Set());
     setSwapPair(null);
     setRotationAngles([0, 0, 0]);
     setIsPaused(false);
+    setIsSwiping(false);
+    setSwipeRay({ active: false, angle: 0, hitPlanets: [], matchType: null });
     processingRef.current = false;
   }, []);
 
-  const selectPlanet = useCallback(
-    (planet: Planet) => {
-      if (stateRef.current.phase !== 'playing' || processingRef.current) return;
-      if (stateRef.current.movesLeft <= 0) return;
+  // --- SWIPE RAY ---
 
-      if (!stateRef.current.selectedPlanetId) {
-        setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
-        return;
-      }
+  const startSwipe = useCallback(() => {
+    if (stateRef.current.phase !== 'playing' || processingRef.current) return;
+    setIsSwiping(true);
+    setSwipeRay({ active: true, angle: 0, hitPlanets: [], matchType: null });
+    // Deselect any selected planet
+    setState((prev) => ({ ...prev, selectedPlanetId: null }));
+  }, []);
 
-      if (stateRef.current.selectedPlanetId === planet.id) {
-        setState((prev) => ({ ...prev, selectedPlanetId: null }));
-        return;
-      }
+  const updateSwipe = useCallback((angle: number) => {
+    if (!isSwiping && !swipeRay.active) return;
+    const normAngle = normalizeAngle(angle);
+    const hits = findPlanetsOnRay(
+      stateRef.current.planets,
+      normAngle,
+      rotationAnglesRef.current
+    );
+    const { matchedPlanets, matchType } = findBestMatch(hits);
 
-      // Find selected planet
-      const selectedPlanet = stateRef.current.planets.find(
-        (p) => p.id === stateRef.current.selectedPlanetId
-      );
-      if (!selectedPlanet) return;
+    setSwipeRay({
+      active: true,
+      angle: normAngle,
+      hitPlanets: hits,
+      matchType,
+    });
+  }, [isSwiping, swipeRay.active]);
 
-      // Must be same orbit
-      if (selectedPlanet.orbitIndex !== planet.orbitIndex) {
-        setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
-        return;
-      }
+  const endSwipe = useCallback(() => {
+    if (!swipeRay.active) return;
 
-      // Swap — snapshot angles now for conjunction checking later
+    const { hitPlanets } = swipeRay;
+    const { matchedPlanets, matchType } = findBestMatch(hitPlanets);
+
+    if (matchedPlanets.length >= 2 && matchType) {
+      // Successful swipe!
       processingRef.current = true;
-      setIsPaused(true);
-      setSwapPair({ a: selectedPlanet, b: planet });
-      setState((prev) => ({
-        ...prev,
-        selectedPlanetId: null,
-        movesLeft: prev.movesLeft - 1,
-      }));
-    },
-    []
-  );
+      const matchIds = new Set(matchedPlanets.map((p) => p.id));
+      const allThreeOrbits = new Set(matchedPlanets.map((p) => p.orbitIndex)).size === 3;
+
+      // Check if perfect alignment
+      const angles = matchedPlanets.map((p) => {
+        const slotAngle = (p.slotIndex * 360) / ORBIT_CONFIGS[p.orbitIndex].slotCount;
+        return normalizeAngle(slotAngle + rotationAnglesRef.current[p.orbitIndex]);
+      });
+      let maxDiff = 0;
+      for (let i = 1; i < angles.length; i++) {
+        const diff = Math.abs(normalizeAngle(angles[i]) - normalizeAngle(angles[0]));
+        const d = Math.min(diff, 360 - diff);
+        if (d > maxDiff) maxDiff = d;
+      }
+      const perfect = maxDiff <= ALIGNMENT_PERFECT;
+
+      const newCombo = stateRef.current.combo + 1;
+      const points = calculateSwipeScore(
+        matchedPlanets.length,
+        allThreeOrbits,
+        perfect,
+        newCombo
+      );
+
+      setRemovingPlanetIds(matchIds);
+
+      // Remove after animation
+      setTimeout(() => {
+        setState((prev) => {
+          const remaining = prev.planets.filter((p) => !matchIds.has(p.id));
+          const filled = fillEmptySlots(remaining);
+          const filledIds = new Set(
+            filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
+          );
+          setNewPlanetIds(filledIds);
+          setRemovingPlanetIds(new Set());
+
+          const newScore = prev.score + points;
+          const movesLeft = prev.movesLeft;
+
+          if (movesLeft <= 0) {
+            return {
+              ...prev,
+              planets: filled,
+              score: newScore,
+              combo: newCombo,
+              phase: 'gameover',
+              bestScore: Math.max(prev.bestScore, newScore),
+            };
+          }
+
+          return {
+            ...prev,
+            planets: filled,
+            score: newScore,
+            combo: newCombo,
+          };
+        });
+
+        setTimeout(() => {
+          setNewPlanetIds(new Set());
+          finishProcessing();
+        }, 600);
+      }, 500);
+    } else {
+      // Missed swipe — reset combo
+      setState((prev) => ({ ...prev, combo: 0 }));
+    }
+
+    setIsSwiping(false);
+    setSwipeRay({ active: false, angle: 0, hitPlanets: [], matchType: null });
+  }, [swipeRay, finishProcessing]);
+
+  // --- TAP TO SWAP (within orbit) ---
+
+  const selectPlanet = useCallback((planet: Planet) => {
+    if (stateRef.current.phase !== 'playing' || processingRef.current) return;
+    if (isSwiping) return;
+
+    const currentSelected = stateRef.current.selectedPlanetId;
+
+    if (!currentSelected) {
+      setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
+      return;
+    }
+
+    if (currentSelected === planet.id) {
+      setState((prev) => ({ ...prev, selectedPlanetId: null }));
+      return;
+    }
+
+    const selectedPlanet = stateRef.current.planets.find((p) => p.id === currentSelected);
+    if (!selectedPlanet) return;
+
+    // Must be same orbit
+    if (selectedPlanet.orbitIndex !== planet.orbitIndex) {
+      setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
+      return;
+    }
+
+    // Swap — costs 1 move
+    if (stateRef.current.movesLeft <= 0) return;
+    setSwapPair({ a: selectedPlanet, b: planet });
+    setState((prev) => ({
+      ...prev,
+      selectedPlanetId: null,
+      movesLeft: prev.movesLeft - 1,
+    }));
+  }, [isSwiping]);
 
   const onSwapComplete = useCallback(() => {
     if (!swapPair) return;
     const { a, b } = swapPair;
-    // Snapshot rotation angles at swap time for consistent conjunction detection
-    const snapshotAngles = [...rotationAnglesRef.current];
 
     setState((prev) => {
       const planets = prev.planets.map((p) => {
@@ -251,269 +277,113 @@ export function useGameState(): UseGameStateReturn {
         if (p.id === b.id) return { ...p, slotIndex: a.slotIndex };
         return p;
       });
+
+      if (prev.movesLeft <= 0) {
+        return {
+          ...prev,
+          planets,
+          phase: 'gameover',
+          bestScore: Math.max(prev.bestScore, prev.score),
+        };
+      }
+
       return { ...prev, planets };
     });
 
     setSwapPair(null);
+  }, [swapPair]);
 
-    // Check conjunctions with snapshotted angles (not from stale closure)
-    setTimeout(() => {
-      const currentState = stateRef.current;
-      processConjunctions(currentState.planets, snapshotAngles, 0, currentState.score);
-    }, 50);
-  }, [swapPair, processConjunctions]);
+  // --- POWER-UPS ---
 
-  const handleDragStart = useCallback(
-    (planet: Planet) => {
-      if (stateRef.current.phase !== 'playing' || processingRef.current) return;
-      if (stateRef.current.movesLeft <= 0) return;
-      setIsTouching(true);
-      setState((prev) => ({ ...prev, selectedPlanetId: planet.id }));
-    },
-    []
-  );
+  const usePowerUp = useCallback((type: PowerUpType) => {
+    if (stateRef.current.phase !== 'playing') return;
+    const pu = stateRef.current.powerUps.find((p) => p.type === type);
+    if (!pu || pu.used) return;
 
-  const handleDragUpdate = useCallback((_planet: Planet, _angle: number) => {
-    // Visual update handled in PlanetView
-  }, []);
+    switch (type) {
+      case PowerUpType.STAR_FREEZE: {
+        freezeActiveRef.current = true;
+        setIsPaused(true);
+        setState((prev) => ({
+          ...prev,
+          powerUps: prev.powerUps.map((p) =>
+            p.type === type ? { ...p, used: true, active: true, remainingTime: 8 } : p
+          ),
+        }));
 
-  const handleDragEnd = useCallback(
-    (planet: Planet) => {
-      setIsTouching(false);
-      if (stateRef.current.phase !== 'playing' || processingRef.current) return;
-      if (stateRef.current.movesLeft <= 0) return;
-
-      const config = ORBIT_CONFIGS[planet.orbitIndex];
-      const currentAngle = normalizeAngle(
-        getSlotAngle(planet.orbitIndex, planet.slotIndex) +
-          rotationAnglesRef.current[planet.orbitIndex]
-      );
-
-      let nearestSlot = planet.slotIndex;
-      let minDist = Infinity;
-      for (let si = 0; si < config.slotCount; si++) {
-        const slotAngle = normalizeAngle(
-          (si * 360) / config.slotCount + rotationAnglesRef.current[planet.orbitIndex]
-        );
-        const dist = Math.abs(currentAngle - slotAngle);
-        if (dist < minDist) {
-          minDist = dist;
-          nearestSlot = si;
-        }
-      }
-
-      if (nearestSlot !== planet.slotIndex) {
-        const occupant = stateRef.current.planets.find(
-          (p) => p.orbitIndex === planet.orbitIndex && p.slotIndex === nearestSlot
-        );
-        if (occupant) {
-          const snapshotAngles = [...rotationAnglesRef.current];
-          processingRef.current = true;
-          setIsPaused(true);
-          setState((prev) => ({
-            ...prev,
-            selectedPlanetId: null,
-            movesLeft: prev.movesLeft - 1,
-            planets: prev.planets.map((p) => {
-              if (p.id === planet.id) return { ...p, slotIndex: nearestSlot };
-              if (p.id === occupant.id) return { ...p, slotIndex: planet.slotIndex };
-              return p;
-            }),
-          }));
-
-          setTimeout(() => {
-            const currentState = stateRef.current;
-            processConjunctions(currentState.planets, snapshotAngles, 0, currentState.score);
-          }, 350);
-        }
-      }
-
-      setState((prev) => ({ ...prev, selectedPlanetId: null }));
-    },
-    [processConjunctions]
-  );
-
-  const usePowerUp = useCallback(
-    (type: PowerUpType) => {
-      if (stateRef.current.phase !== 'playing') return;
-
-      const pu = stateRef.current.powerUps.find((p) => p.type === type);
-      if (!pu || pu.used) return;
-
-      switch (type) {
-        case PowerUpType.NOVA_BURST: {
-          const innerPlanets = stateRef.current.planets.filter((p) => p.orbitIndex === 0);
-          const innerIds = new Set(innerPlanets.map((p) => p.id));
-          // Score based on number cleared
-          const novaScore = innerPlanets.length * 150;
-          setRemovingPlanetIds(innerIds);
-
-          setTimeout(() => {
-            setState((prev) => {
-              const remaining = prev.planets.filter((p) => p.orbitIndex !== 0);
-              const filled = fillEmptySlots(remaining);
-              const newIds = new Set(
-                filled.filter((p) => !remaining.find((r) => r.id === p.id)).map((p) => p.id)
-              );
-              setNewPlanetIds(newIds);
-              setRemovingPlanetIds(new Set());
-
-              return {
-                ...prev,
-                planets: filled,
-                score: prev.score + novaScore,
-                powerUps: prev.powerUps.map((p) =>
-                  p.type === type ? { ...p, used: true } : p
-                ),
-              };
-            });
-          }, 600);
-          break;
-        }
-
-        case PowerUpType.CRYO_FREEZE: {
-          cryoActiveRef.current = true;
-          setIsPaused(true);
-          setState((prev) => ({
-            ...prev,
-            powerUps: prev.powerUps.map((p) =>
-              p.type === type ? { ...p, used: true, active: true, remainingTime: CRYO_DURATION } : p
-            ),
-          }));
-
-          let remaining = CRYO_DURATION;
-          cryoTimerRef.current = setInterval(() => {
-            remaining--;
-            if (remaining <= 0) {
-              if (cryoTimerRef.current) clearInterval(cryoTimerRef.current);
-              cryoActiveRef.current = false;
-              // Only unpause if not currently processing conjunctions
-              if (!processingRef.current) {
-                setIsPaused(false);
-              }
-              setState((prev) => ({
-                ...prev,
-                powerUps: prev.powerUps.map((p) =>
-                  p.type === type ? { ...p, active: false, remainingTime: 0 } : p
-                ),
-              }));
-            } else {
-              setState((prev) => ({
-                ...prev,
-                powerUps: prev.powerUps.map((p) =>
-                  p.type === type ? { ...p, remainingTime: remaining } : p
-                ),
-              }));
-            }
-          }, 1000);
-          break;
-        }
-
-        case PowerUpType.GRAVITY_WELL: {
-          if (!stateRef.current.selectedPlanetId) return;
-          const selected = stateRef.current.planets.find(
-            (p) => p.id === stateRef.current.selectedPlanetId
-          );
-          if (!selected) return;
-
-          const targetType = selected.type;
-
-          setState((prev) => {
-            const newPlanets = prev.planets.map((p) => ({ ...p }));
-            for (let oi = 0; oi < ORBIT_CONFIGS.length; oi++) {
-              const orbitPlanets = newPlanets.filter((p) => p.orbitIndex === oi);
-              const targets = orbitPlanets.filter((p) => p.type === targetType);
-              if (targets.length < 2) continue;
-
-              const avgSlot = Math.round(
-                targets.reduce((sum, p) => sum + p.slotIndex, 0) / targets.length
-              );
-              const slotCount = ORBIT_CONFIGS[oi].slotCount;
-
-              // Track occupied slots properly — update after each swap
-              const slotOccupants = new Map<number, string>();
-              for (const p of orbitPlanets) {
-                slotOccupants.set(p.slotIndex, p.id);
-              }
-
-              // Sort targets by distance from avgSlot
-              targets.sort((a, b) => {
-                const da = Math.min(
-                  Math.abs(a.slotIndex - avgSlot),
-                  slotCount - Math.abs(a.slotIndex - avgSlot)
-                );
-                const db = Math.min(
-                  Math.abs(b.slotIndex - avgSlot),
-                  slotCount - Math.abs(b.slotIndex - avgSlot)
-                );
-                return da - db;
-              });
-
-              let offset = 0;
-              for (const target of targets) {
-                const desiredSlot = ((avgSlot + offset) % slotCount + slotCount) % slotCount;
-                const targetIdx = newPlanets.findIndex((p) => p.id === target.id);
-                const currentSlot = newPlanets[targetIdx].slotIndex;
-
-                if (currentSlot !== desiredSlot) {
-                  const occupantId = slotOccupants.get(desiredSlot);
-                  if (occupantId && occupantId !== target.id) {
-                    const occupantIdx = newPlanets.findIndex((p) => p.id === occupantId);
-                    // Swap: occupant goes to target's current slot
-                    newPlanets[occupantIdx] = { ...newPlanets[occupantIdx], slotIndex: currentSlot };
-                    slotOccupants.set(currentSlot, occupantId);
-                  }
-                  newPlanets[targetIdx] = { ...newPlanets[targetIdx], slotIndex: desiredSlot };
-                  slotOccupants.set(desiredSlot, target.id);
-                }
-
-                offset = offset <= 0 ? -offset + 1 : -offset;
-              }
-            }
-
-            return {
+        let remaining = 8;
+        freezeTimerRef.current = setInterval(() => {
+          remaining--;
+          if (remaining <= 0) {
+            if (freezeTimerRef.current) clearInterval(freezeTimerRef.current);
+            freezeActiveRef.current = false;
+            if (!processingRef.current) setIsPaused(false);
+            setState((prev) => ({
               ...prev,
-              planets: newPlanets,
-              selectedPlanetId: null,
               powerUps: prev.powerUps.map((p) =>
-                p.type === type ? { ...p, used: true } : p
+                p.type === type ? { ...p, active: false, remainingTime: 0 } : p
               ),
-            };
-          });
-
-          // Check conjunctions after gravity well
-          setTimeout(() => {
-            const snapshotAngles = [...rotationAnglesRef.current];
-            processingRef.current = true;
-            setIsPaused(true);
-            const currentState = stateRef.current;
-            processConjunctions(currentState.planets, snapshotAngles, 0, currentState.score);
-          }, 400);
-          break;
-        }
+            }));
+          } else {
+            setState((prev) => ({
+              ...prev,
+              powerUps: prev.powerUps.map((p) =>
+                p.type === type ? { ...p, remainingTime: remaining } : p
+              ),
+            }));
+          }
+        }, 1000);
+        break;
       }
-    },
-    [processConjunctions]
-  );
+
+      case PowerUpType.NOVA_PULSE: {
+        // Find nearest alignment and snap it to perfect
+        const currentAlignments = findAlignments(
+          stateRef.current.planets,
+          rotationAnglesRef.current
+        );
+        if (currentAlignments.length === 0) return;
+
+        // Already handled visually — just mark as used
+        setState((prev) => ({
+          ...prev,
+          powerUps: prev.powerUps.map((p) =>
+            p.type === type ? { ...p, used: true } : p
+          ),
+        }));
+        break;
+      }
+
+      case PowerUpType.CLEANSE_RAY: {
+        // Next swipe will clear everything on the line regardless of type
+        setState((prev) => ({
+          ...prev,
+          powerUps: prev.powerUps.map((p) =>
+            p.type === type ? { ...p, used: true, active: true } : p
+          ),
+        }));
+        break;
+      }
+    }
+  }, []);
 
   return {
     state,
     rotationAngles,
-    isTouching,
+    isSwiping,
     isPaused,
-    activeConjunctions,
-    matchingPlanetIds,
+    swipeRay,
+    alignments,
     removingPlanetIds,
     newPlanetIds,
     swapPair,
     startGame,
     selectPlanet,
-    handleDragStart,
-    handleDragUpdate,
-    handleDragEnd,
+    startSwipe,
+    updateSwipe,
+    endSwipe,
     usePowerUp,
     onSwapComplete,
-    setIsTouching,
     setRotationAngles,
   };
 }
