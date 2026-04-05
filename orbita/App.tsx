@@ -72,7 +72,6 @@ function GameScreen() {
     setShowLevelSelect(false);
     setPendingLevelId(levelId);
     setShowLevelIntro(true);
-    // After 2.5s, start the level
     setTimeout(() => {
       setShowLevelIntro(false);
       startLevel(levelId);
@@ -277,7 +276,7 @@ function GameScreen() {
       )}
 
       {/* Won Screen */}
-      {state.phase === 'won' && (
+      {state.phase === 'won' && !showLevelIntro && (
         <Animated.View
           entering={FadeIn.duration(500)}
           style={styles.gameOverContainer}
@@ -325,7 +324,7 @@ function GameScreen() {
       )}
 
       {/* Game Over Screen — Supernova */}
-      {state.phase === 'gameover' && (
+      {state.phase === 'gameover' && !showLevelIntro && (
         <Animated.View
           entering={FadeIn.duration(500)}
           style={[styles.gameOverContainer, { backgroundColor: 'rgba(80, 10, 0, 0.85)' }]}
