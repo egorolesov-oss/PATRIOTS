@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -65,12 +65,17 @@ export const StarField: React.FC = () => {
   }, []);
 
   return (
-    <>
+    <View style={styles.container} pointerEvents="none">
       {stars.map((star, i) => (
         <TwinkleStar key={i} star={star} />
       ))}
-    </>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  container: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+});
