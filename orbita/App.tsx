@@ -182,6 +182,8 @@ function GameScreen() {
       {(state.phase === 'playing' || state.phase === 'won' || state.phase === 'exploding') && !showTitle && !showLevelSelect && (
         <Animated.View entering={FadeIn.delay(200).duration(500)} style={styles.gameContainer}>
           {/* Top: Rescued + Timer + Swaps */}
+          {/* Level name bar */}
+          <Text style={styles.levelBar}>Level {currentLevel.id}: {currentLevel.name}</Text>
           <View style={styles.topBar}>
             <View style={styles.scoreContainer}>
               <Text style={styles.scoreLabel}>RESCUED</Text>
@@ -416,6 +418,14 @@ const styles = StyleSheet.create({
   gameContainer: {
     flex: 1,
     justifyContent: 'space-between',
+  },
+  levelBar: {
+    color: 'rgba(245, 230, 200, 0.4)',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 2,
+    paddingTop: 4,
   },
   topBar: {
     flexDirection: 'row',
