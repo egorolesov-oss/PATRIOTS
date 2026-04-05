@@ -49,93 +49,95 @@ function playChord(frequencies: number[], duration: number, volume: number = 0.0
 }
 
 export const Sounds = {
-  /** Soft click when selecting a planet */
+  // All sounds tuned to D minor: D E F G A Bb C
+  // D4=294, E4=330, F4=349, G4=392, A4=440, Bb4=466, C5=523, D5=587
+
+  /** Soft click — D5 */
   select() {
-    playTone(660, 0.12, 'sine', 0.1);
+    playTone(587, 0.12, 'sine', 0.1);
   },
 
-  /** Deselect / cancel */
+  /** Deselect — A4 */
   deselect() {
     playTone(440, 0.08, 'sine', 0.06);
   },
 
-  /** Whoosh when planets swap positions */
+  /** Whoosh — D4 → A4 → F4 */
   swap() {
     const ctx = getAudioContext();
     if (!ctx) return;
-
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(300, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.15);
-    osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.3);
-
+    osc.frequency.setValueAtTime(294, ctx.currentTime);        // D4
+    osc.frequency.exponentialRampToValueAtTime(587, ctx.currentTime + 0.15); // D5
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);  // A4
     gain.gain.setValueAtTime(0.08, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.35);
   },
 
-  /** Pleasant chime when 3 planets are collected */
+  /** Match chime — Dm chord (D F A) */
   match() {
-    playChord([523, 659, 784], 0.5, 0.1); // C5, E5, G5 major chord
-    setTimeout(() => playTone(1047, 0.4, 'sine', 0.06), 150); // C6 sparkle
+    playChord([294, 349, 440], 0.5, 0.1); // D4, F4, A4
+    setTimeout(() => playTone(587, 0.4, 'sine', 0.06), 150); // D5 sparkle
   },
 
-  /** Higher pitched match for combos */
+  /** Combo match — ascending Dm inversions */
   comboMatch(combo: number) {
-    const baseFreq = 523 + combo * 50;
-    playChord([baseFreq, baseFreq * 1.26, baseFreq * 1.5], 0.6, 0.1);
-    setTimeout(() => playTone(baseFreq * 2, 0.5, 'sine', 0.07), 150);
+    // Dm: D-F-A, higher with each combo
+    const octave = combo <= 2 ? 1 : combo <= 4 ? 2 : 4;
+    playChord([294 * octave, 349 * octave, 440 * octave], 0.6, 0.08);
+    setTimeout(() => playTone(587 * octave, 0.5, 'sine', 0.05), 150);
   },
 
-  /** Soft pop when new planets appear */
+  /** Spawn — A5, D6 */
   spawn() {
-    playTone(880, 0.08, 'sine', 0.04);
-    setTimeout(() => playTone(1100, 0.06, 'sine', 0.03), 50);
+    playTone(880, 0.08, 'sine', 0.04);  // A5
+    setTimeout(() => playTone(1174, 0.06, 'sine', 0.03), 50); // D6
   },
 
-  /** Gravity lines appearing — subtle hum */
+  /** Gravity hum — D3, A3 */
   gravity() {
-    playTone(220, 0.3, 'sine', 0.03);
-    playTone(330, 0.3, 'sine', 0.02);
+    playTone(147, 0.3, 'sine', 0.03);  // D3
+    playTone(220, 0.3, 'sine', 0.02);  // A3
   },
 
-  /** Power-up activation */
+  /** Power-up — D4 → A4 → D5 ascending */
   powerUp() {
-    playTone(440, 0.15, 'triangle', 0.1);
-    setTimeout(() => playTone(660, 0.15, 'triangle', 0.1), 100);
-    setTimeout(() => playTone(880, 0.3, 'triangle', 0.08), 200);
+    playTone(294, 0.15, 'triangle', 0.1);  // D4
+    setTimeout(() => playTone(440, 0.15, 'triangle', 0.1), 100); // A4
+    setTimeout(() => playTone(587, 0.3, 'triangle', 0.08), 200);  // D5
   },
 
-  /** Shake / shuffle */
+  /** Shake — random D minor scale notes */
   shake() {
+    const dmScale = [294, 330, 349, 392, 440, 466, 523, 587]; // D minor
     for (let i = 0; i < 5; i++) {
       setTimeout(() => {
-        playTone(200 + Math.random() * 400, 0.06, 'sine', 0.05);
+        const note = dmScale[Math.floor(Math.random() * dmScale.length)];
+        playTone(note, 0.06, 'sine', 0.05);
       }, i * 40);
     }
   },
 
-  /** Game over — descending notes */
+  /** Game over — descending D minor: D5 → Bb4 → F4 → D4 */
   gameOver() {
-    playTone(523, 0.3, 'sine', 0.1);
-    setTimeout(() => playTone(440, 0.3, 'sine', 0.1), 300);
-    setTimeout(() => playTone(349, 0.3, 'sine', 0.1), 600);
-    setTimeout(() => playTone(262, 0.6, 'sine', 0.08), 900);
+    playTone(587, 0.3, 'sine', 0.1);   // D5
+    setTimeout(() => playTone(466, 0.3, 'sine', 0.1), 300);  // Bb4
+    setTimeout(() => playTone(349, 0.3, 'sine', 0.1), 600);  // F4
+    setTimeout(() => playTone(294, 0.6, 'sine', 0.08), 900); // D4
   },
 
-  /** Game start — ascending arpeggio */
+  /** Game start — ascending D minor: D4 → F4 → A4 → D5 */
   gameStart() {
-    playTone(262, 0.2, 'sine', 0.08);
-    setTimeout(() => playTone(330, 0.2, 'sine', 0.08), 150);
-    setTimeout(() => playTone(392, 0.2, 'sine', 0.08), 300);
-    setTimeout(() => playTone(523, 0.4, 'sine', 0.1), 450);
+    playTone(294, 0.2, 'sine', 0.08);  // D4
+    setTimeout(() => playTone(349, 0.2, 'sine', 0.08), 150); // F4
+    setTimeout(() => playTone(440, 0.2, 'sine', 0.08), 300); // A4
+    setTimeout(() => playTone(587, 0.4, 'sine', 0.1), 450);  // D5
   },
 };
 
