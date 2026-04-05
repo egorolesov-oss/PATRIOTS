@@ -19,7 +19,7 @@ import {
 const initialPowerUps: PowerUpState[] = [
   { type: PowerUpType.STAR_FREEZE, used: false, active: false },
   { type: PowerUpType.NOVA_PULSE, used: false, active: false },
-  { type: PowerUpType.CLEANSE_RAY, used: false, active: false },
+  { type: PowerUpType.ANTIGRAVITY, used: false, active: false },
 ];
 
 export interface UseGameStateReturn {
@@ -296,13 +296,33 @@ export function useGameState(): UseGameStateReturn {
         }, 1000);
         break;
       }
-      default: {
+      case PowerUpType.NOVA_PULSE: {
         setState((prev) => ({
           ...prev,
           powerUps: prev.powerUps.map((p) =>
             p.type === type ? { ...p, used: true } : p
           ),
         }));
+        break;
+      }
+      case PowerUpType.ANTIGRAVITY: {
+        // Shake/shuffle: randomly reassign planet types across all occupied slots
+        setState((prev) => {
+          const types = prev.planets.map((p) => p.type);
+          // Fisher-Yates shuffle
+          for (let i = types.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [types[i], types[j]] = [types[j], types[i]];
+          }
+          const shuffled = prev.planets.map((p, i) => ({ ...p, type: types[i] }));
+          return {
+            ...prev,
+            planets: shuffled,
+            powerUps: prev.powerUps.map((p) =>
+              p.type === type ? { ...p, used: true } : p
+            ),
+          };
+        });
         break;
       }
     }
