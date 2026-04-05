@@ -38,7 +38,7 @@ function GameScreen() {
   const bgRotation = useSharedValue(0);
   useEffect(() => {
     bgRotation.value = withRepeat(
-      withTiming(360, { duration: 240000, easing: Easing.linear }), // 4 minutes per rotation
+      withTiming(360, { duration: 480000, easing: Easing.linear }), // 8 minutes per rotation
       -1,
       false
     );
