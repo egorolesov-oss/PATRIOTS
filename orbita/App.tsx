@@ -133,6 +133,9 @@ function GameScreen() {
 
           {/* Bottom: Power-ups + Progress */}
           <View style={styles.bottomPanel}>
+            {/* Gradient fade effect using layered Views */}
+            <View style={styles.gradientTop} pointerEvents="none" />
+            <View style={styles.gradientMid} pointerEvents="none" />
             <PowerUpPanel
               powerUps={state.powerUps}
               onUsePowerUp={usePowerUp}
@@ -344,11 +347,31 @@ const styles = StyleSheet.create({
   },
   bottomPanel: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
-    paddingTop: 12,
-    backgroundColor: 'rgba(8, 10, 30, 0.85)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    paddingBottom: 16,
+    backgroundColor: '#060818',
+  },
+  gradientTop: {
+    position: 'absolute',
+    top: -30,
+    left: 0,
+    right: 0,
+    height: 30,
+    backgroundColor: 'rgba(6, 8, 24, 0.0)',
+    borderTopWidth: 0,
+    // Fake gradient: shadow trick
+    shadowColor: '#060818',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 1,
+    shadowRadius: 15,
+    elevation: 20,
+  },
+  gradientMid: {
+    position: 'absolute',
+    top: -15,
+    left: 0,
+    right: 0,
+    height: 15,
+    backgroundColor: 'rgba(6, 8, 24, 0.6)',
   },
   progressBarContainer: {
     height: 4,
