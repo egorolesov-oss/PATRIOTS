@@ -33,7 +33,7 @@ interface Props {
 export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, targetPlanets }) => {
   const centerX = boardSize / 2;
   const centerY = boardSize / 2;
-  const launchY = boardSize - 40;
+  const launchY = boardSize - 20;
 
   const [planets, setPlanets] = useState<GravPlanet[]>([]);
   const [currentPlanet, setCurrentPlanet] = useState<GravPlanet | null>(null);
@@ -259,7 +259,7 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
         {/* HUD */}
         <View style={styles.hud} pointerEvents="none">
           <Text style={styles.hudText}>Orbiting: {stableCount}/{targetPlanets}</Text>
-          {currentPlanet && !isDragging && (
+          {currentPlanet && (
             <Text style={styles.hint}>Swipe up to launch!</Text>
           )}
         </View>
