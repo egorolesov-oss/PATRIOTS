@@ -24,16 +24,17 @@ const PLANET_SPRITES: Record<string, any> = {
 };
 
 interface Props {
-  boardSize: number;
+  boardWidth: number;
+  boardHeight: number;
   onWin: (stableCount: number) => void;
   onLose: (reason: string) => void;
   targetPlanets: number;
 }
 
-export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, targetPlanets }) => {
-  const centerX = boardSize / 2;
-  const centerY = boardSize * 0.38; // star slightly above center — more room below
-  const launchY = boardSize - 15;
+export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, onLose, targetPlanets }) => {
+  const centerX = boardWidth / 2;
+  const centerY = boardHeight * 0.3; // star in upper third
+  const launchY = boardHeight - 30; // planet at very bottom
 
   const [planets, setPlanets] = useState<GravPlanet[]>([]);
   const [currentPlanet, setCurrentPlanet] = useState<GravPlanet | null>(null);
@@ -169,9 +170,9 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
 
   return (
     <GestureDetector gesture={panGesture}>
-      <View style={[styles.container, { width: boardSize, height: boardSize }]}>
+      <View style={[styles.container, { width: boardWidth, height: boardHeight }]}>
         {/* Orbit boundary hint */}
-        <Svg width={boardSize} height={boardSize} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width={boardWidth} height={boardHeight} style={StyleSheet.absoluteFill} pointerEvents="none">
           <SvgCircle
             cx={centerX} cy={centerY} r={BOARD_RADIUS}
             fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={1} strokeDasharray="4,8"

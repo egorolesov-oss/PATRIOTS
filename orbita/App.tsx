@@ -218,7 +218,8 @@ function GameScreen() {
       {showGravity && (
         <Animated.View entering={FadeIn.duration(400)} style={styles.gravityFullscreen}>
           <GravityBoard
-            boardSize={Math.min(SCREEN_W, SCREEN_H - insets.top)}
+            boardWidth={SCREEN_W}
+            boardHeight={SCREEN_H - insets.top}
               targetPlanets={5}
               onWin={(count) => {
                 setTimeout(() => {
