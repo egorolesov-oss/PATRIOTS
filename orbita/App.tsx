@@ -23,12 +23,13 @@ import { StarField } from './src/components/StarField';
 import { GameBoard } from './src/components/GameBoard';
 import { PowerUpPanel } from './src/components/PowerUpPanel';
 import { SupernovaExplosion } from './src/components/SupernovaExplosion';
+import { GravityBoard } from './src/components/GravityBoard';
 import { Tutorial } from './src/components/Tutorial';
 import { useGameState } from './src/hooks/useGameState';
 import { LEVELS } from './src/types/levels';
 import { ARCHITECT_LEVELS } from './src/types/architect';
 import { getSlotPosition } from './src/engine/board';
-import { stopMusic } from './src/engine/sounds';
+import { stopMusic, startMusic } from './src/engine/sounds';
 import { PLANET_CONFIGS } from './src/types/game';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -41,7 +42,7 @@ function GameScreen() {
   const [showTitle, setShowTitle] = useState(true);
   const [showModeSelect, setShowModeSelect] = useState(false);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
-  const [gameMode, setGameMode] = useState<'supernova' | 'architect'>('supernova');
+  const [gameMode, setGameMode] = useState<'supernova' | 'architect' | 'gravity'>('supernova');
   const [showLevelIntro, setShowLevelIntro] = useState(false);
   const [pendingLevelId, setPendingLevelId] = useState(1);
   const [showTutorial, setShowTutorial] = useState(true);
@@ -74,10 +75,17 @@ function GameScreen() {
     }
   }, [showTitle]);
 
-  const handleSelectMode = useCallback((mode: 'supernova' | 'architect') => {
+  const [showGravity, setShowGravity] = useState(false);
+
+  const handleSelectMode = useCallback((mode: 'supernova' | 'architect' | 'gravity') => {
     setGameMode(mode);
     setShowModeSelect(false);
-    setShowLevelSelect(true);
+    if (mode === 'gravity') {
+      setShowGravity(true);
+      startMusic();
+    } else {
+      setShowLevelSelect(true);
+    }
   }, []);
 
   const handleSelectLevel = useCallback((levelId: number) => {
@@ -191,6 +199,58 @@ function GameScreen() {
               <Text style={styles.modeCardDesc}>Build the target constellation pattern</Text>
             </View>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.modeCard}
+            onPress={() => handleSelectMode('gravity')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.modeCardIcon}>🌌</Text>
+            <View style={styles.modeCardContent}>
+              <Text style={styles.modeCardTitle}>ORBIT BUILDER</Text>
+              <Text style={styles.modeCardDesc}>Launch planets into orbit with real gravity!</Text>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* Gravity Mode */}
+      {showGravity && (
+        <Animated.View entering={FadeIn.duration(400)} style={styles.gameContainer}>
+          <View style={styles.levelBarRow}>
+            <Text style={styles.levelBar}>Orbit Builder</Text>
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => {
+                stopMusic();
+                setShowGravity(false);
+                setShowModeSelect(true);
+              }}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.menuButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.boardWrapper}>
+            <GravityBoard
+              boardSize={boardSize}
+              targetPlanets={5}
+              onWin={(count) => {
+                setTimeout(() => {
+                  stopMusic();
+                  setShowGravity(false);
+                  setShowModeSelect(true);
+                }, 3000);
+              }}
+              onLose={(reason) => {
+                setTimeout(() => {
+                  stopMusic();
+                  setShowGravity(false);
+                  setShowModeSelect(true);
+                }, 2000);
+              }}
+            />
+          </View>
         </Animated.View>
       )}
 
