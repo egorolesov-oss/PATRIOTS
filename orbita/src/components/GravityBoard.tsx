@@ -245,6 +245,7 @@ export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, 
         {planets.filter((p) => p.launched).map((p) => {
           const sprite = PLANET_SPRITES[PLANET_CONFIGS[p.type]?.sprite];
           const s = p.radius * 2;
+          const spinDeg = p.rotation;
           return (
             <View
               key={p.id}
@@ -253,6 +254,7 @@ export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, 
                 top: p.y - p.radius,
                 width: s,
                 height: s,
+                transform: [{ rotate: `${spinDeg}deg` }],
               }]}
             >
               <Image source={sprite} style={{ width: s, height: s, borderRadius: p.radius }} resizeMode="cover" />

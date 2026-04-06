@@ -16,6 +16,7 @@ export interface GravPlanet {
   y: number;
   vx: number;
   vy: number;
+  rotation: number; // accumulated visual rotation degrees
   stable: boolean; // has been orbiting long enough
   stableTime: number; // seconds in orbit
   launched: boolean;
@@ -28,7 +29,7 @@ export const PLANET_MASSES: Record<'small' | 'medium' | 'large', { mass: number;
 };
 
 // Planet-planet gravity multiplier (makes interactions more visible)
-export const PLANET_GRAVITY_MULT = 8;
+export const PLANET_GRAVITY_MULT = 40; // strong planet-planet interaction
 
 const SIZES = ['small', 'medium', 'large'] as const;
 
@@ -48,6 +49,7 @@ export function createRandomGravPlanet(x: number, y: number): GravPlanet {
     y,
     vx: 0,
     vy: 0,
+    rotation: 0,
     stable: false,
     stableTime: 0,
     launched: false,
@@ -128,12 +130,22 @@ export function gravityStep(
     let newStableTime = isOrbiting ? p.stableTime + dt : 0;
     let newStable = p.stable || newStableTime > 3;
 
+    // Rotation: angular velocity = tangential speed / radius
+    // Cross product gives orbital direction (CW vs CCW)
+    const cross = (newX - starX) * newVy - (newY - starY) * newVx;
+    const tangentialSpeed = Math.abs(cross) / Math.max(distToStar, 1);
+    const spinDir = cross > 0 ? 1 : -1;
+    // Bigger planets spin slower, smaller spin faster
+    const spinRate = (tangentialSpeed * 3) / (p.radius * 0.5);
+    const newRotation = p.rotation + spinDir * spinRate * dt * 60;
+
     return {
       ...p,
       x: newX,
       y: newY,
       vx: newVx,
       vy: newVy,
+      rotation: newRotation,
       stableTime: newStableTime,
       stable: newStable,
     };
