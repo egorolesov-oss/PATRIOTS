@@ -106,17 +106,26 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
     };
   }, [gameActive, centerX, centerY, targetPlanets, onWin]);
 
-  // Launch gesture
+  // Launch gesture — use translation for direction and distance for force
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+
   const panGesture = Gesture.Pan()
-    .onStart(() => {
+    .onStart((event) => {
       if (!currentPlanet || !gameActive) return;
       setIsDragging(true);
+      startXRef.current = event.x;
+      startYRef.current = event.y;
     })
     .onUpdate((event) => {
       if (!currentPlanet || !isDragging) return;
-      // Velocity from drag direction (inverted — drag down to aim up)
-      const vx = -event.velocityX * 0.003;
-      const vy = -event.velocityY * 0.003;
+      // Direction: from start to current (inverted for "pull back to shoot" feel)
+      const dx = -(event.x - startXRef.current);
+      const dy = -(event.y - startYRef.current);
+      // Scale: 1px drag = 0.8 velocity units
+      const scale = 0.8;
+      const vx = dx * scale;
+      const vy = dy * scale;
       setDragVx(vx);
       setDragVy(vy);
 
@@ -129,17 +138,16 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
       );
       setPreview(pts);
     })
-    .onEnd((event) => {
+    .onEnd(() => {
       if (!currentPlanet || !isDragging) return;
       setIsDragging(false);
       setPreview([]);
 
-      // Launch velocity from swipe
-      const vx = -event.velocityX * 0.003;
-      const vy = -event.velocityY * 0.003;
+      const vx = dragVx;
+      const vy = dragVy;
       const speed = Math.sqrt(vx * vx + vy * vy);
 
-      if (speed < 0.5) return; // too weak
+      if (speed < 5) return; // too weak
 
       Sounds.swap();
 
