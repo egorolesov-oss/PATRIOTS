@@ -220,7 +220,7 @@ function GameScreen() {
           <GravityBoard
             boardWidth={SCREEN_W}
             boardHeight={SCREEN_H - insets.top}
-              targetPlanets={5}
+              targetPlanets={15}
               onWin={(count) => {
                 setTimeout(() => {
                   stopMusic();
