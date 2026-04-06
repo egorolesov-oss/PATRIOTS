@@ -22,10 +22,13 @@ export interface GravPlanet {
 }
 
 export const PLANET_MASSES: Record<'small' | 'medium' | 'large', { mass: number; radius: number }> = {
-  small: { mass: 1, radius: 8 },
-  medium: { mass: 2, radius: 11 },
-  large: { mass: 5, radius: 15 },
+  small: { mass: 2, radius: 6 },
+  medium: { mass: 5, radius: 12 },
+  large: { mass: 12, radius: 20 },
 };
+
+// Planet-planet gravity multiplier (makes interactions more visible)
+export const PLANET_GRAVITY_MULT = 8;
 
 const SIZES = ['small', 'medium', 'large'] as const;
 
@@ -83,23 +86,23 @@ export function gravityStep(
       ay += (forceS * dyS) / (distS * p.mass);
     }
 
-    // Gravity from other planets
+    // Gravity from other planets (amplified)
     for (const other of planets) {
       if (other.id === p.id || !other.launched) continue;
       const dx = other.x - p.x;
       const dy = other.y - p.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 5) {
-        const force = (GRAVITY_G * other.mass * p.mass) / (dist * dist);
+      if (dist > p.radius + other.radius) {
+        const force = (GRAVITY_G * PLANET_GRAVITY_MULT * other.mass * p.mass) / (dist * dist);
         ax += (force * dx) / (dist * p.mass);
         ay += (force * dy) / (dist * p.mass);
       }
     }
 
-    const newVx = p.vx + ax * dt;
-    const newVy = p.vy + ay * dt;
-    const newX = p.x + newVx * dt;
-    const newY = p.y + newVy * dt;
+    let newVx = p.vx + ax * dt;
+    let newVy = p.vy + ay * dt;
+    let newX = p.x + newVx * dt;
+    let newY = p.y + newVy * dt;
 
     // Check star collision
     const distToStar = Math.sqrt((newX - starX) ** 2 + (newY - starY) ** 2);
@@ -136,7 +139,54 @@ export function gravityStep(
     };
   });
 
-  const remaining = updated.filter((p) => !crashed.includes(p.id) && !escaped.includes(p.id));
+  let remaining = updated.filter((p) => !crashed.includes(p.id) && !escaped.includes(p.id));
+
+  // Elastic collisions between planets
+  for (let i = 0; i < remaining.length; i++) {
+    for (let j = i + 1; j < remaining.length; j++) {
+      const a = remaining[i];
+      const b = remaining[j];
+      if (!a.launched || !b.launched) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const minDist = a.radius + b.radius;
+      if (dist < minDist && dist > 0) {
+        // Normalize collision vector
+        const nx = dx / dist;
+        const ny = dy / dist;
+        // Relative velocity
+        const dvx = a.vx - b.vx;
+        const dvy = a.vy - b.vy;
+        const relV = dvx * nx + dvy * ny;
+        if (relV > 0) {
+          // Elastic collision impulse
+          const totalMass = a.mass + b.mass;
+          const impulse = (2 * relV) / totalMass;
+          remaining[i] = {
+            ...a,
+            vx: a.vx - impulse * b.mass * nx,
+            vy: a.vy - impulse * b.mass * ny,
+            // Separate overlapping
+            x: a.x - nx * (minDist - dist) * 0.5,
+            y: a.y - ny * (minDist - dist) * 0.5,
+            stable: false,
+            stableTime: 0,
+          };
+          remaining[j] = {
+            ...b,
+            vx: b.vx + impulse * a.mass * nx,
+            vy: b.vy + impulse * a.mass * ny,
+            x: b.x + nx * (minDist - dist) * 0.5,
+            y: b.y + ny * (minDist - dist) * 0.5,
+            stable: false,
+            stableTime: 0,
+          };
+        }
+      }
+    }
+  }
+
   return { planets: remaining, crashed, escaped };
 }
 
