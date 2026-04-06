@@ -1,12 +1,12 @@
 import { PlanetType, PLANET_CONFIGS } from '../types/game';
 
 // --- PHYSICS CONSTANTS ---
-export const GRAVITY_G = 50;
-export const STAR_MASS = 5000;
-export const STAR_RADIUS = 25; // collision radius
-export const BOARD_RADIUS = 180; // escape boundary
+export const GRAVITY_G = 120;
+export const STAR_MASS = 8000;
+export const STAR_RADIUS = 30; // collision radius (visual is bigger)
+export const BOARD_RADIUS = 220; // escape boundary
 
-// Planet size categories
+// Planet size categories — Earth-like proportions
 export interface GravPlanet {
   id: string;
   type: PlanetType;
@@ -22,9 +22,9 @@ export interface GravPlanet {
 }
 
 export const PLANET_MASSES: Record<'small' | 'medium' | 'large', { mass: number; radius: number }> = {
-  small: { mass: 1, radius: 12 },
-  medium: { mass: 3, radius: 16 },
-  large: { mass: 8, radius: 21 },
+  small: { mass: 1, radius: 8 },
+  medium: { mass: 2, radius: 11 },
+  large: { mass: 5, radius: 15 },
 };
 
 const SIZES = ['small', 'medium', 'large'] as const;

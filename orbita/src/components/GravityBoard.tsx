@@ -145,7 +145,7 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
       const vy = dragVyRef.current;
       const speed = Math.sqrt(vx * vx + vy * vy);
 
-      if (speed < 5) return; // too weak
+      if (speed < 2) return; // too weak
 
       Sounds.swap();
 
@@ -165,7 +165,7 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
       }, 800);
     });
 
-  const starDisplaySize = STAR_SIZE * 1.6;
+  const starDisplaySize = STAR_SIZE * 2.2; // bigger sun
 
   return (
     <GestureDetector gesture={panGesture}>
