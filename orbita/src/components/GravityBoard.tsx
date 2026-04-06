@@ -103,14 +103,12 @@ export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, 
       const newStable = updated.filter((p) => p.stable).length;
       setStableCount(newStable);
 
-      if (newStable >= targetPlanets) {
-        setGameActive(false);
-        Sounds.gameStart();
-        onWin(newStable);
-        return;
-      }
-
       setPlanets(updated);
+
+      // If planets were lost, allow spawning again
+      if ((crashed.length > 0 || escaped.length > 0) && !currentPlanetRef.current && updated.length < targetPlanets) {
+        spawnNext();
+      }
       animRef.current = requestAnimationFrame(animate);
     };
 
@@ -168,9 +166,11 @@ export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, 
       setPlanets((prev) => [...prev, launched]);
       setCurrentPlanet(null);
 
-      // Spawn next after delay
+      // Spawn next after delay — only if under limit
       setTimeout(() => {
-        if (gameActive) spawnNext();
+        if (planetsRef.current.length < targetPlanets) {
+          spawnNext();
+        }
       }, 800);
     });
 
