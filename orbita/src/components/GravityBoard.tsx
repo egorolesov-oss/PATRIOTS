@@ -34,7 +34,7 @@ interface Props {
 export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, onLose, targetPlanets }) => {
   const centerX = boardWidth / 2;
   const centerY = boardHeight / 2; // star in center
-  const launchY = boardHeight - 30; // planet at very bottom
+  const launchY = boardHeight * 0.82; // planet in lower area
 
   const [planets, setPlanets] = useState<GravPlanet[]>([]);
   const [currentPlanet, setCurrentPlanet] = useState<GravPlanet | null>(null);
