@@ -108,16 +108,19 @@ export function gravityStep(
       return p;
     }
 
-    // Check escape
-    if (distToStar > BOARD_RADIUS + 50) {
+    // Check escape — only if far away AND moving away faster than escape velocity
+    const speed = Math.sqrt(newVx * newVx + newVy * newVy);
+    const escapeV = Math.sqrt(2 * GRAVITY_G * STAR_MASS / distToStar);
+    // Radial velocity (positive = moving away from star)
+    const radialV = ((newX - starX) * newVx + (newY - starY) * newVy) / distToStar;
+    if (distToStar > BOARD_RADIUS * 2 && radialV > 0 && speed > escapeV) {
       escaped.push(p.id);
       return p;
     }
 
-    // Check orbit stability (orbiting for 3+ seconds without crashing or escaping)
-    const speed = Math.sqrt(newVx * newVx + newVy * newVy);
+    // Check orbit stability (orbiting for 3+ seconds)
     const circularV = Math.sqrt(GRAVITY_G * STAR_MASS / distToStar);
-    const isOrbiting = distToStar > STAR_RADIUS + 20 && distToStar < BOARD_RADIUS && speed < circularV * 1.8 && speed > circularV * 0.3;
+    const isOrbiting = distToStar > STAR_RADIUS + 20 && speed < circularV * 2 && speed > circularV * 0.2;
 
     let newStableTime = isOrbiting ? p.stableTime + dt : 0;
     let newStable = p.stable || newStableTime > 3;
