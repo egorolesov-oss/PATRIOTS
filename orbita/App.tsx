@@ -216,24 +216,9 @@ function GameScreen() {
 
       {/* Gravity Mode */}
       {showGravity && (
-        <Animated.View entering={FadeIn.duration(400)} style={styles.gameContainer}>
-          <View style={styles.levelBarRow}>
-            <Text style={styles.levelBar}>Orbit Builder</Text>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => {
-                stopMusic();
-                setShowGravity(false);
-                setShowModeSelect(true);
-              }}
-              activeOpacity={0.6}
-            >
-              <Text style={styles.menuButtonText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ flex: 1 }}>
-            <GravityBoard
-              boardSize={Math.min(SCREEN_W, SCREEN_H - insets.top - 50)}
+        <Animated.View entering={FadeIn.duration(400)} style={styles.gravityFullscreen}>
+          <GravityBoard
+            boardSize={Math.min(SCREEN_W, SCREEN_H - insets.top)}
               targetPlanets={5}
               onWin={(count) => {
                 setTimeout(() => {
@@ -250,7 +235,18 @@ function GameScreen() {
                 }, 2000);
               }}
             />
-          </View>
+          {/* Exit button overlay */}
+          <TouchableOpacity
+            style={styles.gravityExitButton}
+            onPress={() => {
+              stopMusic();
+              setShowGravity(false);
+              setShowModeSelect(true);
+            }}
+            activeOpacity={0.6}
+          >
+            <Text style={styles.menuButtonText}>✕</Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
 
@@ -856,6 +852,23 @@ const styles = StyleSheet.create({
     borderColor: '#ff0000',
     borderRadius: 0,
     backgroundColor: 'rgba(255, 0, 0, 0.05)',
+  },
+  gravityFullscreen: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  gravityExitButton: {
+    position: 'absolute',
+    top: 8,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   modeSelectContainer: {
     ...StyleSheet.absoluteFillObject,
