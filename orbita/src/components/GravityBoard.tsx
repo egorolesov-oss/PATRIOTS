@@ -39,15 +39,21 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
   const [currentPlanet, setCurrentPlanet] = useState<GravPlanet | null>(null);
   const [stableCount, setStableCount] = useState(0);
   const [preview, setPreview] = useState<{ x: number; y: number }[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragVx, setDragVx] = useState(0);
-  const [dragVy, setDragVy] = useState(0);
   const [gameActive, setGameActive] = useState(true);
 
   const planetsRef = useRef(planets);
   planetsRef.current = planets;
+  const currentPlanetRef = useRef(currentPlanet);
+  currentPlanetRef.current = currentPlanet;
+  const gameActiveRef = useRef(gameActive);
+  gameActiveRef.current = gameActive;
+  const dragVxRef = useRef(0);
+  const dragVyRef = useRef(0);
   const animRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const isDraggingRef = useRef(false);
 
   // Spawn first planet
   useEffect(() => {
@@ -106,45 +112,37 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
     };
   }, [gameActive, centerX, centerY, targetPlanets, onWin]);
 
-  // Launch gesture — use translation for direction and distance for force
-  const startXRef = useRef(0);
-  const startYRef = useRef(0);
-
+  // Launch gesture — all via refs for gesture thread access
   const panGesture = Gesture.Pan()
     .onStart((event) => {
-      if (!currentPlanet || !gameActive) return;
-      setIsDragging(true);
+      if (!currentPlanetRef.current || !gameActiveRef.current) return;
+      isDraggingRef.current = true;
       startXRef.current = event.x;
       startYRef.current = event.y;
     })
     .onUpdate((event) => {
-      if (!currentPlanet || !isDragging) return;
-      // Direction: from start to current (inverted for "pull back to shoot" feel)
+      if (!currentPlanetRef.current || !isDraggingRef.current) return;
       const dx = -(event.x - startXRef.current);
       const dy = -(event.y - startYRef.current);
-      // Scale: 1px drag = 0.8 velocity units
       const scale = 0.8;
-      const vx = dx * scale;
-      const vy = dy * scale;
-      setDragVx(vx);
-      setDragVy(vy);
+      dragVxRef.current = dx * scale;
+      dragVyRef.current = dy * scale;
 
-      // Show trajectory preview
       const pts = trajectoryPreview(
-        currentPlanet.x, currentPlanet.y,
-        vx, vy,
+        currentPlanetRef.current.x, currentPlanetRef.current.y,
+        dragVxRef.current, dragVyRef.current,
         centerX, centerY,
         80
       );
       setPreview(pts);
     })
     .onEnd(() => {
-      if (!currentPlanet || !isDragging) return;
-      setIsDragging(false);
+      if (!currentPlanetRef.current || !isDraggingRef.current) return;
+      isDraggingRef.current = false;
       setPreview([]);
 
-      const vx = dragVx;
-      const vy = dragVy;
+      const vx = dragVxRef.current;
+      const vy = dragVyRef.current;
       const speed = Math.sqrt(vx * vx + vy * vy);
 
       if (speed < 5) return; // too weak
@@ -152,7 +150,7 @@ export const GravityBoard: React.FC<Props> = ({ boardSize, onWin, onLose, target
       Sounds.swap();
 
       const launched: GravPlanet = {
-        ...currentPlanet,
+        ...currentPlanetRef.current,
         vx,
         vy,
         launched: true,
