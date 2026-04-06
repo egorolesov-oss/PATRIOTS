@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import Svg, { Circle as SvgCircle, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { PLANET_CONFIGS, STAR_SIZE, PlanetType } from '../types/game';
@@ -166,7 +174,27 @@ export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, 
       }, 800);
     });
 
-  const starDisplaySize = STAR_SIZE * 2.2; // bigger sun
+  const starDisplaySize = STAR_SIZE * 2.2;
+
+  // Star pulse animation
+  const starScale = useSharedValue(1);
+  useEffect(() => {
+    starScale.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.95, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      true
+    );
+  }, []);
+  const starAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: centerX - starDisplaySize / 2 },
+      { translateY: centerY - starDisplaySize / 2 },
+      { scale: starScale.value },
+    ],
+  }));
 
   return (
     <GestureDetector gesture={panGesture}>
@@ -198,13 +226,8 @@ export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, 
           ))}
         </Svg>
 
-        {/* Star */}
-        <View style={[styles.star, {
-          left: centerX - starDisplaySize / 2,
-          top: centerY - starDisplaySize / 2,
-          width: starDisplaySize,
-          height: starDisplaySize,
-        }]}>
+        {/* Star — pulsing */}
+        <Animated.View style={[styles.star, { width: starDisplaySize, height: starDisplaySize }, starAnimStyle]}>
           <Svg width={starDisplaySize} height={starDisplaySize}>
             <Defs>
               <RadialGradient id="gravStar" cx="50%" cy="50%" r="50%">
@@ -216,7 +239,7 @@ export const GravityBoard: React.FC<Props> = ({ boardWidth, boardHeight, onWin, 
             </Defs>
             <SvgCircle cx={starDisplaySize / 2} cy={starDisplaySize / 2} r={starDisplaySize / 2} fill="url(#gravStar)" />
           </Svg>
-        </View>
+        </Animated.View>
 
         {/* Orbiting planets */}
         {planets.filter((p) => p.launched).map((p) => {
