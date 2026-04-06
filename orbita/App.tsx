@@ -231,9 +231,9 @@ function GameScreen() {
               <Text style={styles.menuButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.boardWrapper}>
+          <View style={{ flex: 1 }}>
             <GravityBoard
-              boardSize={boardSize}
+              boardSize={Math.min(SCREEN_W, SCREEN_H - insets.top - 50)}
               targetPlanets={5}
               onWin={(count) => {
                 setTimeout(() => {
