@@ -136,7 +136,7 @@ export function gravityStep(
     const tangentialSpeed = Math.abs(cross) / Math.max(distToStar, 1);
     const spinDir = cross > 0 ? 1 : -1;
     // Bigger planets spin slower, smaller spin faster
-    const spinRate = (tangentialSpeed * 3) / (p.radius * 0.5);
+    const spinRate = (tangentialSpeed * 0.6) / (p.radius * 0.5);
     const newRotation = p.rotation + spinDir * spinRate * dt * 60;
 
     return {
